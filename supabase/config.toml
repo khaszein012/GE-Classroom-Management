@@ -1,0 +1,4 @@
+project_id = "classroom-rewards"
+
+[functions.student-login]
+verify_jwt = false
