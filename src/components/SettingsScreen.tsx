@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound } from "lucide-react";
+import { Check, Download, KeyRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { CurrencyColor, CurrencyConfig, CurrencyKind, CurrencySettings } from "@/types";
+import type { Store } from "@/lib/useStore";
+import { getQuizAttempts } from "@/lib/storage";
+import { downloadCsv } from "@/lib/csv";
 import {
   CURRENCY_COLORS,
   CURRENCY_ICONS,
@@ -20,9 +23,10 @@ interface Props {
   onRetrySettings: () => void;
   colorTheme: ColorTheme;
   onUpdateColorTheme: (theme: ColorTheme) => void;
+  store: Store;
 }
 
-export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetrySettings, colorTheme, onUpdateColorTheme }: Props) {
+export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetrySettings, colorTheme, onUpdateColorTheme, store }: Props) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1400px] px-5 py-6 sm:px-8 sm:py-8">
@@ -72,6 +76,18 @@ export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetr
 
         <section className="mt-8">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+            Export class data
+          </h2>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            Download your records as spreadsheets — they open in Excel and Google Sheets.
+          </p>
+          <div className="mt-4">
+            <ExportSection store={store} />
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
             Class currency
           </h2>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
@@ -101,8 +117,145 @@ export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetr
   );
 }
 
-function AccountSection() {
-  const [email, setEmail] = useState("");
+function ExportSection({ store }: { store: Store }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+
+  /** Students with both currency balances (gems derived from the ledger). */
+  const exportStudents = () => {
+    const gemsBalance = new Map<string, number>();
+    const gemsLifetime = new Map<string, number>();
+    for (const t of store.transactions) {
+      if (t.isUndone || t.type !== "achievement") continue;
+      gemsBalance.set(t.studentId, (gemsBalance.get(t.studentId) ?? 0) + t.amount);
+      if (t.amount > 0) gemsLifetime.set(t.studentId, (gemsLifetime.get(t.studentId) ?? 0) + t.amount);
+    }
+    downloadCsv(`genji-students-${today}.csv`, [
+      ["Name", "Username", "Status", "Dollars balance", "Dollars lifetime", "Gems to spend", "Lifetime gems", "Added"],
+      ...store.students.map((s) => [
+        s.displayName,
+        s.username ?? "",
+        s.isActive ? "active" : "inactive",
+        store.totals[s.id] ?? 0,
+        store.lifetime[s.id] ?? 0,
+        gemsBalance.get(s.id) ?? 0,
+        gemsLifetime.get(s.id) ?? 0,
+        new Date(s.createdAt).toLocaleDateString("en-GB"),
+      ]),
+    ]);
+  };
+
+  const exportActivity = () => {
+    const nameById = new Map(store.students.map((s) => [s.id, s.displayName]));
+    const rows: (string | number)[][] = [
+      ["Date", "Student", "Type", "Currency", "Amount", "Reason", "Undone"],
+    ];
+    for (const t of [...store.transactions].sort((a, b) => b.createdAt - a.createdAt)) {
+      rows.push([
+        new Date(t.createdAt).toLocaleString("en-GB"),
+        nameById.get(t.studentId) ?? "Removed student",
+        t.type,
+        t.type === "achievement" ? "Gems" : "Dollars",
+        t.amount,
+        t.reason,
+        t.isUndone ? "yes" : "no",
+      ]);
+    }
+    downloadCsv(`genji-activity-${today}.csv`, rows);
+  };
+
+  const exportQuizResults = async () => {
+    setBusy("quiz");
+    setError(null);
+    try {
+      const nameById = new Map(store.students.map((s) => [s.id, s.displayName]));
+      const rows: (string | number)[][] = [["Quiz", "Student", "Status", "Correct", "Total", "Percent", "Gems", "Submitted"]];
+      const perQuiz = await Promise.all(
+        store.quizzes.map(async (q) => ({
+          title: q.title,
+          due: q.dueAt,
+          attempts: await getQuizAttempts(q.id),
+        })),
+      );
+      for (const q of perQuiz) {
+        const missed = q.due < Date.now();
+        for (const a of q.attempts) {
+          const submitted = a.submittedAt !== null;
+          rows.push([
+            q.title,
+            nameById.get(a.studentId) ?? "Removed student",
+            submitted ? "submitted" : "in progress",
+            a.correctCount ?? "",
+            a.totalCount ?? "",
+            submitted && a.totalCount ? Math.round(((a.correctCount ?? 0) / a.totalCount) * 100) + "%" : "",
+            a.gemsAwarded ?? (missed ? 0 : ""),
+            a.submittedAt ? new Date(a.submittedAt).toLocaleString("en-GB") : "",
+          ]);
+        }
+      }
+      downloadCsv(`genji-quiz-results-${today}.csv`, rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't export quiz results.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <ExportCard
+          title="Students & balances"
+          description="Every student with both currency balances."
+          busy={busy === "quiz"}
+          onClick={exportStudents}
+        />
+        <ExportCard
+          title="Activity log"
+          description="Every award, spend and deduction, newest first."
+          busy={busy === "quiz"}
+          onClick={exportActivity}
+        />
+        <ExportCard
+          title="Quiz results"
+          description="All attempts across every quiz."
+          busy={busy === "quiz"}
+          onClick={() => void exportQuizResults()}
+        />
+      </div>
+      {error && <p className="mt-3 text-sm text-warm-brick">{error}</p>}
+    </div>
+  );
+}
+
+function ExportCard({
+  title,
+  description,
+  busy,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      className="flex min-h-11 items-start gap-3 rounded-card border border-ink-200/70 bg-warm-ivory p-4 text-left shadow-soft transition-colors hover:border-antique-gold/60 hover:bg-ink-50 disabled:opacity-60 dark:border-ink-800/70 dark:bg-ink-900 dark:hover:bg-ink-800/60"
+    >
+      <Download className="mt-0.5 h-4 w-4 shrink-0 text-deep-gold dark:text-antique-gold" aria-hidden />
+      <span>
+        <span className="block text-sm font-semibold text-ink-900 dark:text-warm-ivory">{title}</span>
+        <span className="mt-0.5 block text-xs text-ink-500 dark:text-ink-400">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function AccountSection() {  const [email, setEmail] = useState("");
   useEffect(() => {
     supabase.auth
       .getUser()

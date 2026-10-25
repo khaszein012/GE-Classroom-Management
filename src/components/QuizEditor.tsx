@@ -5,13 +5,16 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Download,
   Lock,
   Plus,
   Rocket,
   Save,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
+import { QUIZ_CSV_TEMPLATE, downloadText, parseQuizCsv } from "@/lib/csv";
 import type { Store } from "@/lib/useStore";
 import type { QuizQuestionType } from "@/types";
 import type { QuizQuestionDraft } from "@/lib/storage";
@@ -90,6 +93,33 @@ export function QuizEditor({ store, quizId, onDone }: Props) {
   const [busy, setBusy] = useState(false);
   const [attemptsExist, setAttemptsExist] = useState(false);
   const [loadedMaxGems, setLoadedMaxGems] = useState<number | null>(null);
+  const [importReport, setImportReport] = useState<{ added: number; errors: string[] } | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
+
+  /** Bulk-import questions from a CSV file (template available in the UI). */
+  const handleCsvFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const { questions: parsed, errors } = parseQuizCsv(text);
+      if (parsed.length > 0) {
+        setQuestions((prev) => [
+          ...prev,
+          ...parsed.map((q) => ({
+            key: nextKey(),
+            type: q.type,
+            body: q.body,
+            options: q.options.map((o) => ({ key: nextKey(), body: o.body, isCorrect: o.isCorrect })),
+          })),
+        ]);
+      }
+      setImportReport({ added: parsed.length, errors });
+      if (parsed.length > 0) {
+        toast.show(`Imported ${parsed.length} ${parsed.length === 1 ? "question" : "questions"}`, "positive");
+      }
+    } catch {
+      setImportReport({ added: 0, errors: ["Couldn't read the file — make sure it is a .csv text file."] });
+    }
+  };
 
   const summary = quizId ? store.quizzes.find((q) => q.id === quizId) : undefined;
   // Once any attempt exists, scoring is frozen: questions, options and max
@@ -456,6 +486,55 @@ export function QuizEditor({ store, quizId, onDone }: Props) {
                     <Plus className="h-4 w-4" />
                     True / false
                   </button>
+                  <button
+                    onClick={() => csvInputRef.current?.click()}
+                    className="flex h-10 items-center gap-2 rounded-button border border-ink-200 px-3 text-sm font-semibold text-ink-700 transition-colors hover:bg-ink-50 dark:border-ink-700 dark:text-ink-200 dark:hover:bg-ink-800"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Import CSV
+                  </button>
+                  <button
+                    onClick={() => downloadText("quiz-template.csv", QUIZ_CSV_TEMPLATE)}
+                    className="flex h-10 items-center gap-2 rounded-button px-3 text-sm font-semibold text-deep-gold transition-colors hover:bg-ink-50 dark:text-antique-gold dark:hover:bg-ink-800/60"
+                  >
+                    <Download className="h-4 w-4" />
+                    Template
+                  </button>
+                  <input
+                    ref={csvInputRef}
+                    type="file"
+                    accept=".csv,text/csv,text/plain"
+                    className="hidden"
+                    aria-label="Import questions from CSV"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleCsvFile(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+              )}
+
+              {importReport && (
+                <div
+                  role="status"
+                  className={`mt-4 rounded-card border px-4 py-3 text-sm ${
+                    importReport.errors.length > 0
+                      ? "border-warm-brick/40 bg-warm-brick/5 dark:border-brick-light/30 dark:bg-warm-brick/10"
+                      : "border-deep-gold/40 bg-ivory-dim dark:border-antique-gold/30 dark:bg-antique-gold/10"
+                  }`}
+                >
+                  <p className="font-semibold text-ink-800 dark:text-ink-100">
+                    Imported {importReport.added} {importReport.added === 1 ? "question" : "questions"}
+                    {importReport.errors.length > 0 && ` · ${importReport.errors.length} ${importReport.errors.length === 1 ? "row" : "rows"} skipped`}
+                  </p>
+                  {importReport.errors.length > 0 && (
+                    <ul className="mt-1.5 max-h-32 list-inside list-disc space-y-0.5 overflow-y-auto text-xs text-warm-brick dark:text-brick-light">
+                      {importReport.errors.map((err) => (
+                        <li key={err}>{err}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </section>

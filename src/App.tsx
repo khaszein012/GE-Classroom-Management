@@ -120,6 +120,7 @@ function MainApp({
                     /* applied locally; persistence needs the Phase 7 migration */
                   });
                 }}
+                store={store}
               />
             )}
           </div>
