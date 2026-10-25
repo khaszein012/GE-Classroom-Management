@@ -74,13 +74,13 @@ export function CurrencyAmount({
   const name = Math.abs(amount) === 1 ? settings.singular : settings.plural;
 
   return (
-    <span className={`inline-flex items-center gap-1 tabular-nums ${className}`}>
+    <span className={`inline-flex items-center gap-1 ${className}`}>
       <CurrencyIcon
         name={settings.icon}
         className={`shrink-0 ${CURRENCY_COLORS[settings.color].icon} ${iconClassName}`}
         strokeWidth={2.25}
       />
-      <span>
+      <span className="font-mono tabular-nums">
         {sign}
         {number}
         {variant === "full" && ` ${name}`}

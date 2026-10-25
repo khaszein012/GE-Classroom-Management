@@ -82,7 +82,9 @@ export function buildActivityGroups(transactions: PointTransaction[]): ActivityG
   return groups;
 }
 
-/** Weekly totals for the trend stats, and daily totals for the chart. */
+/** Weekly totals for the trend stats, and daily totals for the chart.
+ *  Achievement (gems) rows are excluded: the trend tracks the behavior
+ *  currency only. */
 export function buildTrend(transactions: PointTransaction[]): {
   thisWeek: number;
   lastWeek: number;
@@ -100,7 +102,7 @@ export function buildTrend(transactions: PointTransaction[]): {
   for (let i = 0; i < 14; i++) dailyTotals.set(today - i * 86_400_000, 0);
 
   for (const t of transactions) {
-    if (t.isUndone || t.amount < 0) continue;
+    if (t.isUndone || t.amount < 0 || t.type === "achievement") continue;
     const day = startOfDay(t.createdAt);
     if (day >= thisWeekStart) thisWeek += t.amount;
     else if (day >= lastWeekStart) lastWeek += t.amount;

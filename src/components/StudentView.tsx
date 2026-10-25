@@ -11,8 +11,14 @@ import { Skeleton } from "@/components/Skeleton";
 import { buildActivityGroups, buildTrend } from "@/components/student/activity";
 import { TrendChart } from "@/components/student/TrendChart";
 import { ActivityList } from "@/components/student/ActivityList";
-import { GoalPanel, type Goal } from "@/components/student/GoalPanel";
+import { GoalPanel, type Goal, type GoalRewardPreset } from "@/components/student/GoalPanel";
 import { ShopTab } from "@/components/student/ShopTab";
+import { QuizzesTab } from "@/components/student/QuizzesTab";
+import { QuizzesDueCard } from "@/components/student/QuizzesDueCard";
+import type { MyQuizItem, RewardRow } from "@/lib/storage";
+import { getMyQuizList, getShopRewards } from "@/lib/storage";
+import { applyColorTheme, isColorTheme, type ColorTheme } from "@/lib/themes";
+import { ThemePicker } from "@/components/ThemePicker";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import type { CurrencySettings, PointTransaction } from "@/types";
 
@@ -35,7 +41,11 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [savingGoal, setSavingGoal] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"rewards" | "shop">("rewards");
+  const [tab, setTab] = useState<"rewards" | "shop" | "quizzes">("rewards");
+  const [quizzes, setQuizzes] = useState<MyQuizItem[]>([]);
+  const [quizzesError, setQuizzesError] = useState<string | null>(null);
+  const [autoStartId, setAutoStartId] = useState<string | null>(null);
+  const [shopRewards, setShopRewards] = useState<GoalRewardPreset[]>([]);
   const [notes, setNotes] = useState<{ id: number; message: string }[]>([]);
   const [colorOpen, setColorOpen] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
@@ -50,7 +60,13 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const load = useCallback(async (markNew: boolean) => {
     try {
       const prevIds = markNew ? new Set(transactions.map((t) => t.id)) : null;
-      const [safeRow, txns] = await Promise.all([storage.getMyStudentRow(), storage.getMyTransactions()]);
+      const [safeRow, txns, quizRes, shopRes] = await Promise.all([
+        storage.getMyStudentRow(),
+        storage.getMyTransactions(),
+        // Quiz + shop failures never take down the rest of the page.
+        getMyQuizList().catch(() => null),
+        getShopRewards().catch(() => null as RewardRow[] | null),
+      ]);
       const mapped = txns.map(storage.mapTransactionRow);
       if (markNew && prevIds) {
         const fresh = mapped.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
@@ -58,6 +74,18 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
       }
       setRow(safeRow);
       setTransactions(mapped);
+      setQuizzes(quizRes ?? []);
+      setQuizzesError(quizRes === null ? "Couldn't load your quizzes." : null);
+      if (shopRes) {
+        setShopRewards(
+          shopRes.map((r) => ({
+            id: r.id,
+            name: r.name,
+            cost: r.cost,
+            currency: r.currency ?? "dollars",
+          })),
+        );
+      }
       setLoadError(false);
     } catch {
       setLoadError(true);
@@ -86,6 +114,50 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
     };
   }, [load]);
 
+  // Quizzes update live: a newly published quiz or an attempt decision
+  // appears without waiting for the next poll.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const ping = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(false), 500);
+    };
+    const channel = supabase
+      .channel("student-quizzes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "quizzes" }, ping)
+      .on("postgres_changes", { event: "*", schema: "public", table: "quiz_attempts" }, ping)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [load]);
+
+  // This student's own colour theme — never affects anyone else's view.
+  const myTheme: ColorTheme = isColorTheme(row?.theme) ? row.theme : "genji";
+  useEffect(() => {
+    if (!loading && row) applyColorTheme(myTheme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTheme, loading, row === null]);
+  const saveTheme = useCallback(
+    async (theme: ColorTheme) => {
+      applyColorTheme(theme);
+      setRow((prev) => (prev ? { ...prev, theme } : prev));
+      try {
+        await storage.saveMyTheme(theme);
+      } catch {
+        quietNote("Couldn't save your theme — it will reset next time you sign in.");
+      }
+    },
+    [quietNote],
+  );
+
+  // Browser/tab title follows the active tab.
+  useEffect(() => {
+    const label = tab === "rewards" ? "My rewards" : tab === "shop" ? "Shop" : "Quizzes";
+    document.title = `${label} · Genji Educator`;
+  }, [tab]);
+
   const loadMore = useCallback(async () => {
     if (loadingMore) return;
     setLoadingMore(true);
@@ -112,17 +184,40 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
       }
     : null;
 
+  // Achievement currency (gems) — display-only, separate from the balance.
+  const gemsCurrency: CurrencySettings = row?.achievement_currency
+    ? {
+        singular: row.achievement_currency.singular,
+        plural: row.achievement_currency.plural,
+        icon: row.achievement_currency.icon as CurrencySettings["icon"],
+        color: row.achievement_currency.color as CurrencySettings["color"],
+      }
+    : { singular: "Gem", plural: "Gems", icon: "Gem", color: "violet" };
+
   const animatedBalance = useCountUp(row?.balance ?? 0, 900);
 
-  const goal: Goal = { target: row?.goal_target ?? null, label: row?.goal_label ?? null };
+  const goal: Goal = {
+    target: row?.goal_target ?? null,
+    label: row?.goal_label ?? null,
+    currency: row?.goal_currency ?? null,
+  };
 
   const saveGoal = useCallback(
-    async (next: Goal) => {
+    async (next: Goal | { target: null; label: null; currency: null }) => {
       setSavingGoal(true);
       setGoalError(null);
       try {
         await storage.saveMyGoal(next);
-        setRow((prev) => (prev ? { ...prev, goal_target: next.target, goal_label: next.label } : prev));
+        setRow((prev) =>
+          prev
+            ? {
+                ...prev,
+                goal_target: next.target,
+                goal_label: next.label,
+                goal_currency: next.target === null ? null : next.currency ?? "dollars",
+              }
+            : prev,
+        );
       } catch (e) {
         // Surface the database's own message so failures are diagnosable.
         setGoalError(e instanceof Error ? e.message : "Could not save your goal. Try again.");
@@ -152,6 +247,16 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const groups = useMemo(() => buildActivityGroups(transactions), [transactions]);
   const trend = useMemo(() => buildTrend(transactions), [transactions]);
   const hasMore = transactions.length >= PAGE_SIZE && transactions.length % PAGE_SIZE === 0;
+
+  // Open, unsubmitted quizzes power the dashboard card and the tab badge.
+  const now = Date.now();
+  const openQuizzes = quizzes.filter(
+    (q) => q.status === "published" && !q.submitted && q.dueAt > now,
+  );
+  const dueCount = openQuizzes.length;
+  const dueQuizzes = [...openQuizzes].sort((a, b) => a.dueAt - b.dueAt).slice(0, 3);
+  const dueVisible = dueQuizzes.length > 0;
+
   if (loading) return <StudentSkeleton />;
 
   if (loadError || !row || !currency) {
@@ -171,7 +276,7 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const iconClass = ICON_COLORS[currency.color] ?? "text-deep-gold";
 
   return (
-    <div className="h-screen overflow-hidden bg-ink-50 dark:bg-ink-950">
+    <div className="flex min-h-screen flex-col bg-ink-50 dark:bg-ink-950">
       <ReconnectBanner />
       {/* Quiet notifications (bottom-right, auto-dismiss) */}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2">
@@ -227,27 +332,37 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
           </div>
           <div>
             <h1 className="max-w-[140px] truncate text-[15px] font-bold leading-tight text-ink-900 dark:text-warm-ivory sm:max-w-[220px]">{row.display_name}</h1>
-            <p className="text-[11px] text-ink-400 dark:text-ink-500">My rewards</p>
+            <p className="text-[11px] text-ink-400 dark:text-ink-500">
+              {tab === "rewards" ? "My rewards" : tab === "shop" ? "Shop" : "Quizzes"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-button border border-ink-200 bg-warm-ivory p-0.5 dark:border-ink-700 dark:bg-ink-900">
-            {(["rewards", "shop"] as const).map((t) => (
+            {(["rewards", "shop", "quizzes"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`rounded-button px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                aria-pressed={tab === t}
+                title={t === "quizzes" && dueCount > 0 ? `${dueCount} quizzes due` : undefined}
+                className={`flex items-center rounded-button px-3 py-1.5 text-xs font-semibold transition-colors ${
                   tab === t
                     ? "bg-obsidian dark:bg-antique-gold dark:text-obsidian text-warm-ivory"
                     : "text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
                 }`}
               >
-                {t === "rewards" ? "My rewards" : "Shop"}
+                {t === "rewards" ? "My rewards" : t === "shop" ? "Shop" : "Quizzes"}
+                {t === "quizzes" && dueCount > 0 && (
+                  <span className="ml-1.5 rounded-full bg-warm-brick px-1.5 py-px font-mono text-[10px] font-bold tabular-nums text-warm-ivory">
+                    {dueCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
           <button
             onClick={onSignOut}
+            aria-label="Sign out"
             className="flex h-10 items-center gap-2 rounded-button border border-ink-200 px-3 text-sm font-semibold text-ink-600 transition-colors hover:bg-ink-100 dark:border-ink-700 dark:text-ink-300 dark:hover:bg-ink-800"
           >
             <LogOut className="h-4 w-4" />
@@ -257,16 +372,38 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
       </header>
 
       {/* Mobile: single column (page scrolls). Tablet: 2 columns. Desktop: 12-col grid, page fixed. */}
-      <main className="h-[calc(100vh-4rem)] overflow-y-auto md:overflow-hidden">
+      {/* The page itself is the only scroll context: content grows it. */}
+      <main className="min-w-0 flex-1">
         {tab === "shop" ? (
-          <div className="mx-auto h-full w-full max-w-[1200px] overflow-y-auto p-5 md:p-6 lg:p-8">
-            <ShopTab balance={row.balance} currency={currency} onQuietNote={quietNote} />
+          <div className="mx-auto w-full max-w-[1200px] p-5 md:p-6 lg:p-8">
+            <ShopTab
+              balance={row.balance}
+              currency={currency}
+              gemsBalance={row.gems_balance ?? 0}
+              gemsCurrency={gemsCurrency}
+              onQuietNote={quietNote}
+            />
+          </div>
+        ) : tab === "quizzes" ? (
+          <div className="mx-auto w-full max-w-[1200px] p-5 md:p-6 lg:p-8">
+            <QuizzesTab
+              quizzes={quizzes}
+              quizzesError={quizzesError}
+              gems={gemsCurrency}
+              gemsEarned={row.gems_lifetime ?? 0}
+              onRetry={() => void load(false)}
+              onGemsChanged={() => void load(false)}
+              autoStartId={autoStartId}
+              onAutoStartConsumed={() => setAutoStartId(null)}
+            />
           </div>
         ) : (
-        <div className="mx-auto h-full w-full max-w-[1200px] p-5 md:p-6 lg:p-8">
-          <div className="flex h-full flex-col gap-5 md:grid md:h-full md:grid-cols-2 md:gap-6 lg:grid-cols-12">
-            {/* Row 1: balance (8 cols) + trend (4 cols) */}
-            <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-6 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-8">
+        <div className="mx-auto w-full max-w-[1200px] p-5 md:p-6 lg:p-8">
+          {/* Mobile order = importance: balance/gems, quizzes due, goal,
+              activity, trend, theme. Desktop places explicitly below. */}
+          <div className="grid gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-12">
+            {/* Row 1: balance (left) + quizzes due (right) */}
+            <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-6 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-8 lg:col-start-1 lg:row-start-1">
               <p className="text-xs font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
                 Current balance
               </p>
@@ -288,19 +425,70 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
                   {row.lifetime_earned}
                 </p>
               </div>
-            </section>
-
-            <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-6 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
-                Last 14 days
-              </h2>
-              <div className="mt-4">
-                <TrendChart trend={trend} currency={currency} />
+              <div className="mt-3 border-t border-ink-100 pt-3 dark:border-ink-800">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-400 dark:text-ink-500">
+                  {gemsCurrency.plural} to spend
+                </p>
+                <p className="mt-0.5 flex items-center gap-1.5 font-mono text-lg font-bold tabular-nums text-ink-600 dark:text-ink-300">
+                  <CurrencyIcon
+                    name={gemsCurrency.icon}
+                    className="h-4 w-4 text-deep-gold dark:text-antique-gold"
+                    aria-hidden
+                  />
+                  {row.gems_balance ?? 0}
+                  <span className="font-sans text-[11px] font-normal text-ink-400 dark:text-ink-500">
+                    from quizzes — separate from your {currency.plural.toLowerCase()}
+                  </span>
+                </p>
+                <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-ink-400 dark:text-ink-500">
+                  Lifetime {gemsCurrency.plural.toLowerCase()} earned
+                </p>
+                <p className="mt-0.5 flex items-center gap-1.5 font-mono text-sm font-bold tabular-nums text-ink-500 dark:text-ink-400">
+                  <CurrencyIcon
+                    name={gemsCurrency.icon}
+                    className="h-3.5 w-3.5 text-ink-400 dark:text-ink-500"
+                    aria-hidden
+                  />
+                  {row.gems_lifetime ?? 0}
+                  <span className="font-sans text-[11px] font-normal text-ink-400 dark:text-ink-500">
+                    your achievement score — spending never reduces it
+                  </span>
+                </p>
               </div>
             </section>
 
-            {/* Row 2: activity (8 cols) + right column (goal above summary, 4 cols) */}
-            <section className="flex min-h-[280px] flex-col rounded-card border border-ink-200/70 bg-warm-ivory p-5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 md:min-h-0 lg:col-span-8 lg:col-start-1 lg:row-start-2">
+            {dueVisible && (
+              <QuizzesDueCard
+                quizzes={dueQuizzes}
+                totalOpen={dueCount}
+                gems={gemsCurrency}
+                className="animate-slide-up lg:col-span-4 lg:col-start-9 lg:row-start-1"
+                onStart={(quiz) => {
+                  setTab("quizzes");
+                  setAutoStartId(quiz.quizId);
+                }}
+                onViewAll={() => setTab("quizzes")}
+              />
+            )}
+
+            {/* My goal — third on mobile, bottom-left on desktop */}
+            <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-4 lg:col-start-1 lg:row-start-3">
+              <GoalPanel
+                goal={goal}
+                dollarBalance={row.balance}
+                gemsBalance={row.gems_balance ?? 0}
+                dollarCurrency={currency}
+                gemsCurrency={gemsCurrency}
+                presets={shopRewards}
+                onSave={(g) => void saveGoal(g)}
+                saving={savingGoal}
+                error={goalError}
+              />
+            </section>
+
+            {/* Activity grows with its content — no inner scrollbar; the
+                list is capped by pagination ("Load more") instead. */}
+            <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-8 lg:col-start-1 lg:row-start-2">
               <ActivityList
                 groups={groups}
                 hasMore={hasMore}
@@ -309,17 +497,25 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
               />
             </section>
 
-            <section className="flex flex-col gap-6 lg:col-span-4 lg:col-start-9 lg:row-start-2">
-              <div className="rounded-card border border-ink-200/70 bg-warm-ivory p-5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900">
-                <GoalPanel
-                  goal={goal}
-                  balance={row.balance}
-                  currency={currency}
-                  onSave={(g) => void saveGoal(g)}
-                  saving={savingGoal}
-                  error={goalError}
-                />
+            <section
+              className={`rounded-card border border-ink-200/70 bg-warm-ivory p-6 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-4 lg:col-start-9 ${
+                dueVisible ? "lg:row-start-2" : "lg:row-start-1"
+              }`}
+            >
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+                Last 14 days
+              </h2>
+              <div className="mt-4">
+                <TrendChart trend={trend} currency={currency} />
               </div>
+            </section>
+
+            {/* My theme — last on mobile; on desktop it sits beside the goal */}
+            <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-4 lg:col-start-5 lg:row-start-3">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
+                My theme
+              </h2>
+              <ThemePicker current={myTheme} onSelect={(t) => void saveTheme(t)} />
             </section>
           </div>
         </div>

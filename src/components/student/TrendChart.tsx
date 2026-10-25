@@ -64,11 +64,15 @@ export function TrendChart({
               style={{ height: `${Math.max(b.total > 0 ? b.height : 4, 4)}%` }}
               title={`${b.total > 0 ? `${b.total} earned` : "No points"} — ${b.label}`}
             />
+            {/* Sparse axis: "Now" plus every other date, so labels never
+                crowd or clip at any breakpoint. */}
             <span
-              className={`max-w-full truncate text-[9px] leading-none ${
-                b.isToday
-                  ? "font-bold text-deep-gold dark:text-antique-gold"
-                  : "text-ink-400 dark:text-ink-600"
+              className={`whitespace-nowrap text-[9px] leading-none ${
+                i % 2 === 0 || b.isToday
+                  ? b.isToday
+                    ? "font-bold text-deep-gold dark:text-antique-gold"
+                    : "text-ink-400 dark:text-ink-600"
+                  : "invisible"
               }`}
             >
               {b.label}

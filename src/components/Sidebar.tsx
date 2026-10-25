@@ -1,8 +1,8 @@
-import { History, Home, LogOut, Menu, Moon, Settings, Store, Sun, Users, X, Zap } from "lucide-react";
+import { ClipboardList, History, Home, LogOut, Menu, Moon, Settings, Store, Sun, Users, X, Zap } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useState } from "react";
 
-export type Screen = "dashboard" | "students" | "behaviors" | "rewards" | "activity" | "settings";
+export type Screen = "dashboard" | "students" | "behaviors" | "rewards" | "quizzes" | "activity" | "settings";
 
 interface Props {
   current: Screen;
@@ -25,6 +25,7 @@ const NAV: { id: Screen; label: string; icon: typeof Home }[] = [
   { id: "students", label: "Students", icon: Users },
   { id: "behaviors", label: "Behaviors", icon: Zap },
   { id: "rewards", label: "Rewards", icon: Store },
+  { id: "quizzes", label: "Quizzes", icon: ClipboardList },
   { id: "activity", label: "Activity", icon: History },
   { id: "settings", label: "Settings", icon: Settings },
 ];

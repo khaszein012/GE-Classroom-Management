@@ -54,7 +54,10 @@ export function Dashboard({ store, onGoToStudents }: Props) {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const todayTs = startOfToday.getTime();
-    const todays = transactions.filter((t) => t.createdAt >= todayTs && !t.isUndone);
+    // Achievement (gems) rows are a separate score, not class currency.
+    const todays = transactions.filter(
+      (t) => t.createdAt >= todayTs && !t.isUndone && t.type !== "achievement",
+    );
     const pointsToday = todays.reduce((sum, t) => sum + t.amount, 0);
     const awardsToday = todays.length;
     const classTotal = Object.values(totals).reduce((sum, v) => sum + v, 0);

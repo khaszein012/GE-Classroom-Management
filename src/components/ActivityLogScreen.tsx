@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { History, RotateCcw, Search, Undo2 } from "lucide-react";
+import { Gem, History, RotateCcw, Search, Undo2 } from "lucide-react";
 import type { Store } from "@/lib/useStore";
 import { useToast } from "@/components/Toast";
 import { relativeTime } from "@/lib/time";
@@ -14,12 +14,15 @@ interface Props {
   store: Store;
 }
 
+type CurrencyFilter = "all" | "behavior" | "achievement";
+
 export function ActivityLogScreen({ store }: Props) {
   const { students, behaviors, transactions } = store;
   const toast = useToast();
   const { config } = useCurrency();
   const [studentFilter, setStudentFilter] = useState<string>("all");
   const [signFilter, setSignFilter] = useState<"all" | "positive" | "negative">("all");
+  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>("all");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -49,6 +52,10 @@ export function ActivityLogScreen({ store }: Props) {
         if (studentFilter !== "all" && t.studentId !== studentFilter) return false;
         if (signFilter === "positive" && t.amount <= 0) return false;
         if (signFilter === "negative" && t.amount >= 0) return false;
+        // Currency separation: behavior/spend/adjustment are the class
+        // currency; achievement rows are quiz gems — never mixed or summed.
+        if (currencyFilter === "behavior" && t.type === "achievement") return false;
+        if (currencyFilter === "achievement" && t.type !== "achievement") return false;
         if (q) {
           const sName = studentMap[t.studentId]?.name?.toLowerCase() ?? "";
           const reason = (t.behaviorId ? behaviorMap[t.behaviorId]?.label ?? t.reason : t.reason).toLowerCase();
@@ -57,7 +64,7 @@ export function ActivityLogScreen({ store }: Props) {
         return true;
       })
       .sort((a, b) => b.createdAt - a.createdAt);
-  }, [transactions, studentFilter, signFilter, query, studentMap, behaviorMap]);
+  }, [transactions, studentFilter, signFilter, currencyFilter, query, studentMap, behaviorMap]);
 
   const handleUndo = async (id: string) => {
     try {
@@ -109,7 +116,26 @@ export function ActivityLogScreen({ store }: Props) {
               </option>
             ))}
           </select>
-          <div className="flex rounded-button border border-ink-200 bg-warm-ivory p-1 dark:border-ink-700 dark:bg-ink-900">
+          <div className="flex rounded-button border border-ink-200 bg-warm-ivory p-1 dark:border-ink-700 dark:bg-ink-900" role="group" aria-label="Filter by currency">
+            {(["all", "behavior", "achievement"] as CurrencyFilter[]).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setCurrencyFilter(opt)}
+                aria-pressed={currencyFilter === opt}
+                className={`flex items-center gap-1.5 rounded-button px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  currencyFilter === opt
+                    ? opt === "achievement"
+                      ? "bg-antique-gold/20 text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold"
+                      : "bg-ink-100 text-ink-700 dark:bg-ink-800 dark:text-ink-200"
+                    : "text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
+                }`}
+              >
+                {opt === "achievement" && <Gem className="h-3.5 w-3.5" aria-hidden />}
+                {opt === "all" ? "All" : config[opt].plural}
+              </button>
+            ))}
+          </div>
+          <div className="flex rounded-button border border-ink-200 bg-warm-ivory p-1 dark:border-ink-700 dark:bg-ink-900" role="group" aria-label="Filter by sign">
             {(["all", "positive", "negative"] as const).map((opt) => (
               <button
                 key={opt}
@@ -155,21 +181,30 @@ export function ActivityLogScreen({ store }: Props) {
                 const behavior = t.behaviorId ? behaviorMap[t.behaviorId] : undefined;
                 const label = behavior?.label ?? t.reason;
                 const positive = t.amount >= 0;
+                const isGems = t.type === "achievement";
                 return (
                   <li
                     key={t.id}
                     className={`flex items-center gap-3 rounded-card border bg-warm-ivory px-3 py-3 transition-colors sm:px-4 dark:bg-ink-900 ${
-                      t.isUndone
-                        ? "border-ink-100 opacity-60 dark:border-ink-800/50"
-                        : "border-ink-200/70 dark:border-ink-800/70"
-                    }`}
+                      isGems
+                        ? "border-antique-gold/50 bg-antique-gold/[0.06] dark:border-antique-gold/30 dark:bg-antique-gold/[0.07]"
+                        : t.isUndone
+                          ? "border-ink-100 opacity-60 dark:border-ink-800/50"
+                          : "border-ink-200/70 dark:border-ink-800/70"
+                    } ${t.isUndone ? "opacity-70" : ""}`}
                   >
                     <Monogram name={student?.name ?? "?"} colorIndex={student?.colorIndex ?? 0} size="md" />
                     <div className={`min-w-0 flex-1 ${t.isUndone ? "line-through" : ""}`}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm font-semibold text-ink-900 dark:text-ink-100">
                           {student?.name ?? "Removed student"}
                         </span>
+                        {isGems && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-antique-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
+                            <Gem className="h-3 w-3" aria-hidden />
+                            {config.achievement.plural}
+                          </span>
+                        )}
                       </div>
                       <div className="truncate text-xs text-ink-500 dark:text-ink-400">
                         {label} · {relativeTime(t.createdAt)}

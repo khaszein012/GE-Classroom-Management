@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { ActivityGroup } from "@/components/student/activity";
 import { relativeTime } from "@/lib/time";
@@ -7,7 +7,9 @@ type Filter = "all" | "earned" | "spent";
 
 /**
  * Day-grouped, run-collapsed activity list. Pure presentation; receives
- * already-paginated transactions. Desktop panels scroll this list internally.
+ * already-paginated transactions. The list grows with its content and the
+ * page scrolls it — length is capped by pagination ("Load more"), never by
+ * a fixed height with an inner scrollbar.
  */
 export function ActivityList({ groups, hasMore, loadingMore, onLoadMore }: {
   groups: ActivityGroup[];
@@ -16,11 +18,6 @@ export function ActivityList({ groups, hasMore, loadingMore, onLoadMore }: {
   onLoadMore: () => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [groups]);
 
   const visible = groups
     .map((g) => ({
@@ -32,7 +29,7 @@ export function ActivityList({ groups, hasMore, loadingMore, onLoadMore }: {
     .filter((g) => g.entries.length > 0);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
           Activity
@@ -54,7 +51,7 @@ export function ActivityList({ groups, hasMore, loadingMore, onLoadMore }: {
         </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div>
         {visible.length === 0 ? (
           <p className="py-10 text-center text-sm text-ink-400 dark:text-ink-500">
             No activity yet. Awards and deductions will appear here.

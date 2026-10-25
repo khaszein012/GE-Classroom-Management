@@ -103,7 +103,7 @@ export function LoginScreen() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <BrandLockup />
-          <h1 className="mt-4 font-display text-3xl font-semibold text-obsidian dark:text-warm-ivory">GENJI EDUCATOR</h1>
+          <h1 className="brand-text mt-4 font-display text-3xl font-semibold">GENJI EDUCATOR</h1>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             {tab === "teacher" ? "Teacher sign in" : "Student sign in"}
           </p>

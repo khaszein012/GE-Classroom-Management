@@ -29,7 +29,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+      {/* Top-centred on phones (clear of sticky bottom bars), bottom-right on larger screens */}
+      <div className="pointer-events-none fixed inset-x-4 top-4 z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-auto sm:items-end">
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
         ))}
@@ -60,13 +61,13 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   const Icon = toneConfig.icon;
 
   return (
-    <div className="pointer-events-auto flex w-72 animate-slide-in-right items-center gap-3 overflow-hidden rounded-card bg-warm-ivory py-3 pl-3 pr-2 shadow-soft-lg dark:bg-ink-800">
+    <div className="pointer-events-auto flex w-full animate-slide-in-right items-center gap-3 overflow-hidden rounded-card bg-warm-ivory py-3 pl-3 pr-2 shadow-soft-lg sm:w-72 dark:bg-ink-800">
       <div className={`h-9 w-1 shrink-0 rounded-full ${toneConfig.bar}`} />
       <Icon className={`h-5 w-5 shrink-0 ${toneConfig.iconColor}`} />
       <span className="flex-1 text-sm font-medium text-ink-800 dark:text-ink-100">{toast.message}</span>
       <button
         onClick={onDismiss}
-        className="flex h-7 w-7 items-center justify-center rounded-button text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-button text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-700"
         aria-label="Dismiss"
       >
         <X className="h-4 w-4" />

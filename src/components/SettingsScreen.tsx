@@ -10,15 +10,19 @@ import {
   validateCurrencyName,
 } from "@/lib/currency";
 import { CurrencyAmount, CurrencyIcon } from "@/components/CurrencyAmount";
+import { ThemePicker } from "@/components/ThemePicker";
+import type { ColorTheme } from "@/lib/themes";
 
 interface Props {
   config: CurrencyConfig;
   onUpdateCurrency: (kind: CurrencyKind, settings: CurrencySettings) => void;
   settingsError: boolean;
   onRetrySettings: () => void;
+  colorTheme: ColorTheme;
+  onUpdateColorTheme: (theme: ColorTheme) => void;
 }
 
-export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetrySettings }: Props) {
+export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetrySettings, colorTheme, onUpdateColorTheme }: Props) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1400px] px-5 py-6 sm:px-8 sm:py-8">
@@ -55,13 +59,41 @@ export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetr
 
         <section className="mt-8">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+            Appearance
+          </h2>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            Your console's colour theme. Applies instantly and follows you on any device — it
+            never affects what your students see.
+          </p>
+          <div className="mt-4">
+            <ThemePicker current={colorTheme} onSelect={onUpdateColorTheme} />
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
             Class currency
           </h2>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             Name your class currencies. Changes apply everywhere instantly.
           </p>
-          <div className="mt-4">
-            <CurrencyCard key="behavior" kind="behavior" title="Behavior currency" description="Earned from behaviors and spent in the reward shop." config={config} onUpdateCurrency={onUpdateCurrency} />
+          <div className="mt-4 space-y-4">
+            <CurrencyCard
+              key="behavior"
+              kind="behavior"
+              title="Behavior currency"
+              description="Earned from behaviors and spent in the reward shop."
+              config={config}
+              onUpdateCurrency={onUpdateCurrency}
+            />
+            <CurrencyCard
+              key="achievement"
+              kind="achievement"
+              title="Achievement currency"
+              description="Awarded by quizzes only. A separate score — it can't be spent in the shop."
+              config={config}
+              onUpdateCurrency={onUpdateCurrency}
+            />
           </div>
         </section>
       </div>

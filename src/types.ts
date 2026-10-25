@@ -73,6 +73,7 @@ export interface Reward {
   name: string;
   description: string | null;
   cost: number; // positive integer
+  currency: RewardCurrency;
   stock: number | null; // null = unlimited
   isActive: boolean;
   isArchived: boolean;
@@ -83,14 +84,70 @@ export interface Reward {
 
 export type RedemptionStatus = "pending" | "approved" | "declined" | "cancelled";
 
+/** Which sealed economy a price or request belongs to. */
+export type RewardCurrency = "dollars" | "gems";
+
 export interface Redemption {
   id: string;
   studentId: string;
   rewardId: string;
   rewardName?: string;
   costAtRequest: number;
+  currency: RewardCurrency;
   status: RedemptionStatus;
   requestedAt: number;
   decidedAt: number | null;
   note: string | null;
+}
+
+// ---------- Quizzes ----------
+
+export type QuizStatus = "draft" | "published" | "closed";
+export type QuizQuestionType = "multiple_choice" | "true_false";
+
+export interface Quiz {
+  id: string;
+  title: string;
+  description: string | null;
+  maxGems: number;
+  dueAt: number;
+  status: QuizStatus;
+  createdAt: number;
+}
+
+/** Quiz row as shown in the teacher list, with aggregated counts. */
+export interface QuizSummary extends Quiz {
+  questionCount: number;
+  assignedCount: number;
+  startedCount: number;
+  submittedCount: number;
+}
+
+export interface QuizOption {
+  id: string;
+  questionId: string;
+  body: string;
+  isCorrect: boolean;
+  position: number;
+}
+
+export interface QuizQuestion {
+  id: string;
+  quizId: string;
+  body: string;
+  type: QuizQuestionType;
+  position: number;
+  options: QuizOption[];
+}
+
+/** One student's attempt on a quiz. */
+export interface QuizAttempt {
+  id: string;
+  quizId: string;
+  studentId: string;
+  startedAt: number;
+  submittedAt: number | null;
+  correctCount: number | null;
+  totalCount: number | null;
+  gemsAwarded: number | null;
 }

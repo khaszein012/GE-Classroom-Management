@@ -5,6 +5,7 @@ import { StudentsScreen } from "@/components/StudentsScreen";
 import { BehaviorsScreen } from "@/components/BehaviorsScreen";
 import { ActivityLogScreen } from "@/components/ActivityLogScreen";
 import { RewardsScreen } from "@/components/RewardsScreen";
+import { QuizzesScreen } from "@/components/QuizzesScreen";
 import { SettingsScreen } from "@/components/SettingsScreen";
 import { LoginScreen } from "@/components/LoginScreen";
 import { StudentView } from "@/components/StudentView";
@@ -15,6 +16,7 @@ import { ToastProvider, useToast } from "@/components/Toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useStore, type Store } from "@/lib/useStore";
 import { useTheme } from "@/lib/useTheme";
+import { applyColorTheme } from "@/lib/themes";
 import { migrateLegacyData } from "@/lib/migrate";
 import { Skeleton } from "@/components/Skeleton";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
@@ -29,6 +31,16 @@ function BootScreen() {
     </div>
   );
 }
+
+const SCREEN_TITLES: Record<Screen, string> = {
+  dashboard: "Dashboard",
+  students: "Students",
+  behaviors: "Behaviors",
+  rewards: "Rewards",
+  quizzes: "Quizzes",
+  activity: "Activity Log",
+  settings: "Settings",
+};
 
 function MainApp({
   store,
@@ -45,6 +57,16 @@ function MainApp({
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [printing, setPrinting] = useState(false);
   const pendingCount = store.redemptions.filter((r) => r.status === "pending").length;
+
+  // The teacher's saved theme becomes authoritative once loaded; until then
+  // the cached theme from before first paint stays applied (no flash).
+  useEffect(() => {
+    if (!store.loading) applyColorTheme(store.colorTheme);
+  }, [store.colorTheme, store.loading]);
+
+  useEffect(() => {
+    document.title = `${SCREEN_TITLES[screen]} · Genji Educator`;
+  }, [screen]);
 
   if (printing) {
     return <PrintCards students={store.students} onBack={() => setPrinting(false)} />;
@@ -75,7 +97,7 @@ function MainApp({
             </button>
           </div>
         ) : (
-          <>
+          <div key={screen} className="h-full animate-slide-up">
             {screen === "dashboard" && (
               <Dashboard store={store} onGoToStudents={() => setScreen("students")} />
             )}
@@ -84,6 +106,7 @@ function MainApp({
             )}
             {screen === "behaviors" && <BehaviorsScreen store={store} />}
             {screen === "rewards" && <RewardsScreen store={store} />}
+            {screen === "quizzes" && <QuizzesScreen store={store} />}
             {screen === "activity" && <ActivityLogScreen store={store} />}
             {screen === "settings" && (
               <SettingsScreen
@@ -91,9 +114,15 @@ function MainApp({
                 onUpdateCurrency={updateCurrency}
                 settingsError={settingsError}
                 onRetrySettings={onRetrySettings}
+                colorTheme={store.colorTheme}
+                onUpdateColorTheme={(t) => {
+                  store.saveColorTheme(t).catch(() => {
+                    /* applied locally; persistence needs the Phase 7 migration */
+                  });
+                }}
               />
             )}
-          </>
+          </div>
         )}
       </main>
     </div>

@@ -48,7 +48,7 @@ export function RequestsPanel({ store }: { store: Store }) {
     setUndoBusy(id);
     try {
       await store.undoRedemptionApproval(id);
-      toast.show("Approval undone — points refunded, stock restored", "info");
+      toast.show("Approval undone — refund issued, stock restored", "info");
     } catch (e) {
       toast.show(e instanceof Error ? e.message : "Could not undo", "negative");
     } finally {
@@ -98,13 +98,17 @@ export function RequestsPanel({ store }: { store: Store }) {
                   </div>
                 </div>
                 <span className="shrink-0 rounded-full bg-ivory-dim px-2.5 py-1 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
-                  <CurrencyAmount amount={r.costAtRequest} iconClassName="h-3.5 w-3.5" />
+                  <CurrencyAmount
+                    amount={r.costAtRequest}
+                    kind={r.currency === "gems" ? "achievement" : "behavior"}
+                    iconClassName="h-3.5 w-3.5"
+                  />
                 </span>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <button
                     onClick={() => { setNoteFor({ id: r.id, action: "approve" }); setNote(""); }}
                     disabled={busyId !== null}
-                    className="flex h-9 items-center gap-1.5 rounded-button bg-deep-gold dark:bg-antique-gold dark:text-obsidian px-3 text-xs font-semibold text-warm-ivory transition-colors hover:bg-ink-700 dark:hover:bg-deep-gold disabled:opacity-50"
+                    className="flex h-10 items-center gap-1.5 rounded-button bg-deep-gold dark:bg-antique-gold dark:text-obsidian px-3 text-xs font-semibold text-warm-ivory transition-colors hover:bg-ink-700 dark:hover:bg-deep-gold disabled:opacity-50"
                   >
                     <Check className="h-3.5 w-3.5" />
                     Approve
@@ -112,7 +116,7 @@ export function RequestsPanel({ store }: { store: Store }) {
                   <button
                     onClick={() => { setNoteFor({ id: r.id, action: "decline" }); setNote(""); }}
                     disabled={busyId !== null}
-                    className="flex h-9 items-center gap-1.5 rounded-button bg-warm-brick dark:bg-brick-light dark:text-obsidian px-3 text-xs font-semibold text-warm-ivory transition-colors hover:bg-warm-brick disabled:opacity-50"
+                    className="flex h-10 items-center gap-1.5 rounded-button bg-warm-brick dark:bg-brick-light dark:text-obsidian px-3 text-xs font-semibold text-warm-ivory transition-colors hover:bg-warm-brick disabled:opacity-50"
                   >
                     <X className="h-3.5 w-3.5" />
                     Decline
@@ -173,8 +177,9 @@ export function RequestsPanel({ store }: { store: Store }) {
                     }`}
                   />
                   <span className="truncate">
-                    {student?.displayName ?? "Removed student"} · {rewardName(r.rewardId)} · {r.costAtRequest}{" "}
-                    {config.behavior.plural.toLowerCase()}
+                    {student?.displayName ?? "Removed student"} · {rewardName(r.rewardId)} ·{" "}
+                    {r.costAtRequest}{" "}
+                    {(r.currency === "gems" ? config.achievement.plural : config.behavior.plural).toLowerCase()}
                   </span>
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <span className="hidden sm:inline">{relativeTime(r.decidedAt ?? r.requestedAt)}</span>
@@ -182,7 +187,7 @@ export function RequestsPanel({ store }: { store: Store }) {
                       <button
                         onClick={() => void undo(r.id)}
                         disabled={undoBusy !== null}
-                        className="flex h-7 items-center gap-1 rounded-button bg-ink-100 px-2 text-[11px] font-semibold text-ink-600 transition-colors hover:bg-ink-200 disabled:opacity-50 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
+                        className="flex h-8 items-center gap-1 rounded-button bg-ink-100 px-2 text-[11px] font-semibold text-ink-600 transition-colors hover:bg-ink-200 disabled:opacity-50 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
                       >
                         <Undo2 className="h-3 w-3" />
                         Undo

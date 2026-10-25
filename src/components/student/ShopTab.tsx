@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock, Store, X } from "lucide-react";
+import { Clock, Gem, Store, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as storage from "@/lib/storage";
-import type { Reward } from "@/types";
-import type { CurrencySettings } from "@/types";
+import type { Reward, RewardCurrency, CurrencySettings } from "@/types";
 import { relativeTime } from "@/lib/time";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { RewardThumbnail } from "@/components/RewardThumbnail";
@@ -13,30 +12,38 @@ export interface MyRedemption {
   rewardId: string;
   rewardName: string;
   costAtRequest: number;
+  currency: RewardCurrency;
   status: "pending" | "approved" | "declined" | "cancelled";
   requestedAt: number;
   decidedAt: number | null;
   note: string | null;
 }
 
+type ShopFilter = "all" | "dollars" | "gems";
+
 /**
- * The student's Shop tab: active rewards as cards, a confirm step before
- * requesting, their own request history, and live updates when the teacher
- * decides. All value logic (price, balance, stock) is enforced server-side;
- * this view only reflects it.
+ * The student's Shop tab. Two sealed economies side by side: rewards priced
+ * in Dollars (behaviour money) and rewards priced in Gems (quiz money).
+ * Affordability always compares against the matching balance — never across
+ * currencies — and there is no conversion between the two.
  */
 export function ShopTab({
   balance,
   currency,
+  gemsBalance,
+  gemsCurrency,
   onQuietNote,
 }: {
   balance: number;
   currency: CurrencySettings;
+  gemsBalance: number;
+  gemsCurrency: CurrencySettings;
   onQuietNote: (message: string) => void;
 }) {
   const [rewards, setRewards] = useState<Reward[] | null>(null);
   const [redemptions, setRedemptions] = useState<MyRedemption[] | null>(null);
   const [error, setError] = useState(false);
+  const [filter, setFilter] = useState<ShopFilter>("all");
   const [confirming, setConfirming] = useState<Reward | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -50,6 +57,7 @@ export function ShopTab({
         rewardId: row.reward_id,
         rewardName: row.rewards?.name ?? "Reward",
         costAtRequest: row.cost_at_request,
+        currency: row.currency ?? "dollars",
         status: row.status,
         requestedAt: new Date(row.requested_at).getTime(),
         decidedAt: row.decided_at ? new Date(row.decided_at).getTime() : null,
@@ -60,6 +68,7 @@ export function ShopTab({
         name: row.name,
         description: row.description,
         cost: row.cost,
+        currency: row.currency ?? "dollars",
         stock: row.stock,
         isActive: row.is_active,
         isArchived: row.is_archived,
@@ -88,7 +97,6 @@ export function ShopTab({
       .on("postgres_changes", { event: "*", schema: "public", table: "redemptions" }, () => {
         void load().then((mine) => {
           if (!mine || !alive) return;
-          // Quiet notification when one of my pending requests gets decided.
           for (const m of mine) {
             if (m.status === "pending" || decidedIdsRef.current.has(m.id)) continue;
             decidedIdsRef.current.add(m.id);
@@ -159,8 +167,15 @@ export function ShopTab({
 
   if (!rewards) return <ShopSkeleton />;
 
+  const settingsFor = (c: RewardCurrency) => (c === "gems" ? gemsCurrency : currency);
+  const balanceFor = (c: RewardCurrency) => (c === "gems" ? gemsBalance : balance);
+
   const list = rewards;
   const history = redemptions ?? [];
+  const dollarRewards = list.filter((r) => r.currency !== "gems");
+  const gemRewards = list.filter((r) => r.currency === "gems");
+  const visible =
+    filter === "dollars" ? dollarRewards : filter === "gems" ? gemRewards : list;
 
   return (
     <div className="flex flex-col gap-6">
@@ -170,77 +185,113 @@ export function ShopTab({
         </div>
       )}
 
+      {/* Your two balances, labelled — never combined */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-card border border-ink-200/70 bg-warm-ivory px-4 py-3 shadow-soft dark:border-ink-800/70 dark:bg-ink-900">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+            <CurrencyIcon name={currency.icon} className="h-3.5 w-3.5" aria-hidden />
+            {currency.plural} to spend
+          </p>
+          <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-ink-900 dark:text-warm-ivory">
+            {balance}
+          </p>
+          <p className="text-[11px] text-ink-400 dark:text-ink-500">earned from behaviours</p>
+        </div>
+        <div className="rounded-card border border-ink-200/70 bg-warm-ivory px-4 py-3 shadow-soft dark:border-ink-800/70 dark:bg-ink-900">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+            <CurrencyIcon name={gemsCurrency.icon} className="h-3.5 w-3.5" aria-hidden />
+            {gemsCurrency.plural} to spend
+          </p>
+          <p className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-ink-900 dark:text-warm-ivory">
+            {gemsBalance}
+          </p>
+          <p className="text-[11px] text-ink-400 dark:text-ink-500">earned from quizzes</p>
+        </div>
+      </div>
+
       <section>
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <Store className="h-4 w-4 text-ink-500 dark:text-ink-400" />
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-600 dark:text-ink-300">Shop</h2>
-          <span className="text-xs font-medium text-ink-400 dark:text-ink-500">{list.length} rewards</span>
-        </div>
-
-        {list.length === 0 ? (
-          <p className="rounded-button bg-ink-50 px-3 py-8 text-center text-sm text-ink-400 dark:bg-ink-800/50 dark:text-ink-500">
-            No rewards available right now.
-          </p>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((r) => {
-              const pending = pendingByReward.get(r.id);
-              const soldOut = r.stock === 0;
-              const need = r.cost - balance;
-              const disabled = soldOut || need > 0 || !!pending;
-              let label = "Request";
-              if (pending) label = "Requested";
-              else if (soldOut) label = "Sold out";
-              else if (need > 0) label = `Need ${need} ${need === 1 ? currency.singular.toLowerCase() : currency.plural.toLowerCase()}`;
+          <div
+            className="flex rounded-button border border-ink-200 bg-warm-ivory p-0.5 dark:border-ink-700 dark:bg-ink-900"
+            role="group"
+            aria-label="Filter shop by currency"
+          >
+            {(["all", "dollars", "gems"] as ShopFilter[]).map((f) => {
+              const label =
+                f === "all" ? "All" : f === "dollars" ? currency.plural : gemsCurrency.plural;
+              const selected = filter === f;
               return (
-                <li
-                  key={r.id}
-                  className={`flex flex-col rounded-card border bg-warm-ivory p-4 shadow-soft transition-colors dark:bg-ink-900 ${
-                    soldOut
-                      ? "border-ink-100 opacity-60 dark:border-ink-800/60"
-                      : "border-ink-200/70 dark:border-ink-800/70"
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  aria-pressed={selected}
+                  className={`flex min-h-11 items-center gap-1.5 rounded-button px-3 text-xs font-semibold transition-colors ${
+                    selected
+                      ? "bg-obsidian text-warm-ivory dark:bg-antique-gold dark:text-obsidian"
+                      : "text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
                   }`}
                 >
-                  <div className="-mx-4 -mt-4 mb-3">
-                    <RewardThumbnail
-                      imageUrl={r.imageUrl}
-                      name={r.name}
-                      className="aspect-[4/3] w-full"
-                    />
-                  </div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100">
-                      {r.name}
-                    </h3>
-                    <span className="shrink-0 rounded-full bg-ivory-dim px-2.5 py-1 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
-                      <span className="inline-flex items-center gap-1.5">
-                        <CurrencyIcon name={currency.icon} className="h-3.5 w-3.5" />
-                        <span>{r.cost}</span>
-                        <span>{r.cost === 1 ? currency.singular : currency.plural}</span>
-                      </span>
-                    </span>
-                  </div>
-                  {r.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-ink-500 dark:text-ink-400">{r.description}</p>
+                  {f === "gems" && <Gem className="h-3.5 w-3.5" aria-hidden />}
+                  {f === "dollars" && (
+                    <CurrencyIcon name={currency.icon} className="h-3.5 w-3.5" aria-hidden />
                   )}
-                  <div className="mt-2 text-xs font-medium text-ink-400 dark:text-ink-500">
-                    {r.stock === null ? "In stock" : soldOut ? "Sold out" : `${r.stock} left`}
-                  </div>
-                  <button
-                    onClick={() => setConfirming(r)}
-                    disabled={disabled}
-                    className={`mt-3 flex h-9 w-full items-center justify-center rounded-button text-xs font-semibold transition-colors ${
-                      disabled
-                        ? "cursor-not-allowed bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500"
-                        : "bg-obsidian dark:bg-antique-gold dark:text-obsidian text-warm-ivory hover:bg-ink-700 dark:hover:bg-deep-gold"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                </li>
+                  {label}
+                </button>
               );
             })}
-          </ul>
+          </div>
+          <span className="ml-auto text-xs font-medium text-ink-400 dark:text-ink-500">
+            {visible.length} {visible.length === 1 ? "reward" : "rewards"}
+          </span>
+        </div>
+
+        {filter === "gems" && gemRewards.length === 0 ? (
+          <div className="rounded-card border-2 border-dashed border-ink-200 px-4 py-8 text-center dark:border-ink-700">
+            <Gem className="mx-auto h-6 w-6 text-deep-gold dark:text-antique-gold" aria-hidden />
+            <p className="mt-2 text-sm font-semibold text-ink-800 dark:text-ink-100">
+              No {gemsCurrency.plural.toLowerCase()} rewards yet
+            </p>
+            <p className="mx-auto mt-1 max-w-xs text-sm text-ink-500 dark:text-ink-400">
+              {gemsCurrency.plural} come from quizzes. When your teacher adds{" "}
+              {gemsCurrency.singular.toLowerCase()}-priced rewards, they'll appear here for you to
+              spend them on.
+            </p>
+          </div>
+        ) : filter === "all" ? (
+          <div className="space-y-5">
+            {dollarRewards.length > 0 && (
+              <RewardGroup
+                title={`Buy with ${currency.plural}`}
+                icon={<CurrencyIcon name={currency.icon} className="h-3.5 w-3.5" aria-hidden />}
+                rewards={dollarRewards}
+                pendingByReward={pendingByReward}
+                balanceFor={balanceFor}
+                settingsFor={settingsFor}
+                onRequest={setConfirming}
+              />
+            )}
+            {gemRewards.length > 0 && (
+              <RewardGroup
+                title={`Buy with ${gemsCurrency.plural}`}
+                icon={<Gem className="h-3.5 w-3.5" aria-hidden />}
+                rewards={gemRewards}
+                pendingByReward={pendingByReward}
+                balanceFor={balanceFor}
+                settingsFor={settingsFor}
+                onRequest={setConfirming}
+              />
+            )}
+          </div>
+        ) : (
+          <RewardGrid
+            rewards={visible}
+            pendingByReward={pendingByReward}
+            balanceFor={balanceFor}
+            settingsFor={settingsFor}
+            onRequest={setConfirming}
+          />
         )}
       </section>
 
@@ -262,6 +313,7 @@ export function ShopTab({
                   key={r.id}
                   r={r}
                   imageUrl={reward?.imageUrl ?? null}
+                  settings={settingsFor(r.currency)}
                   busy={busy === r.id}
                   onCancel={() => void cancel(r.id)}
                 />
@@ -281,18 +333,31 @@ export function ShopTab({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold text-ink-900 dark:text-warm-ivory">Request "{confirming.name}"?</h3>
-            <p className="mt-2 text-sm text-ink-600 dark:text-ink-300">
-              It costs <strong>{confirming.cost}</strong> {confirming.cost === 1 ? currency.singular : currency.plural}.
-              Nothing is deducted now — your teacher decides.
-            </p>
-            <div className="mt-3 rounded-button bg-ink-50 px-3 py-2.5 text-sm dark:bg-ink-800/60">
-              <div className="flex items-center justify-between text-ink-600 dark:text-ink-300">
-                <span>Balance after approval</span>
-                <span className="font-bold tabular-nums">
-                  {Math.max(0, balance - confirming.cost)}
-                </span>
-              </div>
-            </div>
+            {(() => {
+              const settings = settingsFor(confirming.currency);
+              const bal = balanceFor(confirming.currency);
+              const name = confirming.cost === 1 ? settings.singular : settings.plural;
+              return (
+                <>
+                  <p className="mt-2 text-sm text-ink-600 dark:text-ink-300">
+                    It costs{" "}
+                    <strong className="font-mono tabular-nums">{confirming.cost}</strong> {name}. Nothing is
+                    deducted now — your teacher decides.
+                  </p>
+                  <div className="mt-3 rounded-button bg-ink-50 px-3 py-2.5 text-sm dark:bg-ink-800/60">
+                    <div className="flex items-center justify-between text-ink-600 dark:text-ink-300">
+                      <span className="flex items-center gap-1.5">
+                        <CurrencyIcon name={settings.icon} className="h-3.5 w-3.5" aria-hidden />
+                        {name} after approval
+                      </span>
+                      <span className="font-mono font-bold tabular-nums">
+                        {Math.max(0, bal - confirming.cost)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 onClick={() => setConfirming(null)}
@@ -315,7 +380,135 @@ export function ShopTab({
   );
 }
 
-function MyRequestRow({ r, imageUrl, busy, onCancel }: { r: MyRedemption; imageUrl: string | null; busy: boolean; onCancel: () => void }) {
+function RewardGroup({
+  title,
+  icon,
+  rewards,
+  pendingByReward,
+  balanceFor,
+  settingsFor,
+  onRequest,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  rewards: Reward[];
+  pendingByReward: Map<string, MyRedemption>;
+  balanceFor: (c: RewardCurrency) => number;
+  settingsFor: (c: RewardCurrency) => CurrencySettings;
+  onRequest: (r: Reward) => void;
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+        {icon}
+        {title}
+      </h3>
+      <RewardGrid
+        rewards={rewards}
+        pendingByReward={pendingByReward}
+        balanceFor={balanceFor}
+        settingsFor={settingsFor}
+        onRequest={onRequest}
+      />
+    </div>
+  );
+}
+
+function RewardGrid({
+  rewards,
+  pendingByReward,
+  balanceFor,
+  settingsFor,
+  onRequest,
+}: {
+  rewards: Reward[];
+  pendingByReward: Map<string, MyRedemption>;
+  balanceFor: (c: RewardCurrency) => number;
+  settingsFor: (c: RewardCurrency) => CurrencySettings;
+  onRequest: (r: Reward) => void;
+}) {
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {rewards.map((r) => {
+        const settings = settingsFor(r.currency);
+        const balance = balanceFor(r.currency);
+        const pending = pendingByReward.get(r.id);
+        const soldOut = r.stock === 0;
+        const need = r.cost - balance;
+        const disabled = soldOut || need > 0 || !!pending;
+        const unit = (n: number) => (n === 1 ? settings.singular.toLowerCase() : settings.plural.toLowerCase());
+        let label = "Request";
+        if (pending) label = "Requested";
+        else if (soldOut) label = "Sold out";
+        else if (need > 0) label = `Need ${need} more ${unit(need)}`;
+        return (
+          <li
+            key={r.id}
+            className={`flex flex-col rounded-card border bg-warm-ivory p-4 shadow-soft transition-colors dark:bg-ink-900 ${
+              soldOut
+                ? "border-ink-100 opacity-60 dark:border-ink-800/60"
+                : "border-ink-200/70 dark:border-ink-800/70"
+            }`}
+          >
+            <div className="-mx-4 -mt-4 mb-3">
+              <RewardThumbnail
+                imageUrl={r.imageUrl}
+                name={r.name}
+                className="aspect-[4/3] w-full"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="min-w-0 text-sm font-semibold text-ink-900 dark:text-ink-100">
+                <span className="break-words">{r.name}</span>
+              </h3>
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-ivory-dim px-2.5 py-1 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
+                <CurrencyIcon name={settings.icon} className="h-3.5 w-3.5" aria-hidden />
+                <span className="font-mono tabular-nums">{r.cost}</span>
+                <span>{r.cost === 1 ? settings.singular : settings.plural}</span>
+              </span>
+            </div>
+            {r.description && (
+              <p className="mt-1 line-clamp-2 text-xs text-ink-500 dark:text-ink-400">{r.description}</p>
+            )}
+            <div className="mt-2 text-xs font-medium text-ink-400 dark:text-ink-500">
+              {r.stock === null ? "In stock" : soldOut ? "Sold out" : `${r.stock} left`}
+            </div>
+            <button
+              onClick={() => onRequest(r)}
+              disabled={disabled}
+              aria-label={
+                disabled
+                  ? `${r.name} — ${label}`
+                  : `Request ${r.name} for ${r.cost} ${r.cost === 1 ? settings.singular : settings.plural}`
+              }
+              className={`mt-3 flex h-11 w-full items-center justify-center rounded-button px-2 text-center text-xs font-semibold transition-colors ${
+                disabled
+                  ? "cursor-not-allowed bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500"
+                  : "bg-obsidian dark:bg-antique-gold dark:text-obsidian text-warm-ivory hover:bg-ink-700 dark:hover:bg-deep-gold"
+              }`}
+            >
+              {label}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function MyRequestRow({
+  r,
+  imageUrl,
+  settings,
+  busy,
+  onCancel,
+}: {
+  r: MyRedemption;
+  imageUrl: string | null;
+  settings: CurrencySettings;
+  busy: boolean;
+  onCancel: () => void;
+}) {
   const pending = r.status === "pending";
   return (
     <li
@@ -329,8 +522,10 @@ function MyRequestRow({ r, imageUrl, busy, onCancel }: { r: MyRedemption; imageU
       <StatusBadge status={r.status} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-ink-900 dark:text-ink-100">{r.rewardName}</div>
-        <div className="truncate text-xs text-ink-500 dark:text-ink-400">
-          {r.costAtRequest} · {relativeTime(r.requestedAt)}
+        <div className="flex items-center gap-1 truncate text-xs text-ink-500 dark:text-ink-400">
+          <CurrencyIcon name={settings.icon} className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="font-mono tabular-nums">{r.costAtRequest}</span>
+          <span className="truncate">· {relativeTime(r.requestedAt)}</span>
           {r.note && <> · {r.note}</>}
         </div>
       </div>
@@ -338,7 +533,7 @@ function MyRequestRow({ r, imageUrl, busy, onCancel }: { r: MyRedemption; imageU
         <button
           onClick={onCancel}
           disabled={busy}
-          className="flex h-8 shrink-0 items-center gap-1 rounded-button border border-ink-200 px-2.5 text-xs font-semibold text-ink-600 transition-colors hover:bg-warm-brick/10 hover:text-warm-brick disabled:opacity-50 dark:border-ink-700 dark:text-ink-300 dark:hover:bg-warm-brick/10"
+          className="flex h-9 shrink-0 items-center gap-1 rounded-button border border-ink-200 px-2.5 text-xs font-semibold text-ink-600 transition-colors hover:bg-warm-brick/10 hover:text-warm-brick disabled:opacity-50 dark:border-ink-700 dark:text-ink-300 dark:hover:bg-warm-brick/10"
         >
           <X className="h-3.5 w-3.5" />
           Cancel

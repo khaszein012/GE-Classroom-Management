@@ -5,16 +5,103 @@
 @tailwind utilities;
 
 :root {
-  --obsidian: #0b0d10;
-  --antique-gold: #c6a15b;
-  --warm-ivory: #f4f0e7;
-  --deep-gold: #8b6a31;
-  --ivory-dim: #eae3d2;
-  --warm-brick: #9c4230;
-  --brick-light: #e08a73;
-  --surface-dark: #14171c;
-  --border-light: rgba(11, 13, 16, 0.12);
-  --border-dark: rgba(244, 240, 231, 0.12);
+  /*
+   * Colour theme tokens (R G B channel triplets). The active set is chosen
+   * by [data-theme] on <html>; light/dark mode is a separate axis handled
+   * by Tailwind's dark: variant swapping token NAMES, not values — so each
+   * theme needs exactly one set. Adding a theme = adding one block here.
+   *
+   * Genji (default) — unchanged original palette.
+   */
+  --c-obsidian: 11 13 16;          /* near-black ink */
+  --c-antique-gold: 198 161 91;    /* mid accent */
+  --c-warm-ivory: 244 240 231;     /* light surface / dark-mode primary text */
+  --c-deep-gold: 139 106 49;       /* accent for text on light surfaces */
+  --c-ivory-dim: 234 227 210;      /* dim surface / chips */
+  --c-warm-brick: 156 66 48;       /* negative on light */
+  --c-brick-light: 224 138 115;    /* negative on dark */
+  --c-ink-50: 244 240 231;
+  --c-ink-100: 234 227 210;
+  --c-ink-200: 216 207 189;
+  --c-ink-300: 185 174 154;
+  --c-ink-400: 129 121 107;
+  --c-ink-500: 93 87 78;
+  --c-ink-600: 64 60 53;
+  --c-ink-700: 41 39 34;
+  --c-ink-800: 20 23 28;
+  --c-ink-900: 15 18 22;
+  --c-ink-950: 11 13 16;
+
+  /* Brand constants — the Genji identity never changes with theme. */
+  --brand-ink: 11 13 16;
+  --brand-ivory: 244 240 231;
+  --brand-gold: 198 161 91;
+}
+
+/* Indigo Night — cool and modern: deep indigo ink, periwinkle accent. */
+[data-theme="indigo"] {
+  --c-obsidian: 14 16 35;
+  --c-antique-gold: 143 151 232;
+  --c-warm-ivory: 242 243 250;
+  --c-deep-gold: 74 83 168;
+  --c-ivory-dim: 227 229 245;
+  --c-warm-brick: 176 71 46;
+  --c-brick-light: 236 143 111;
+  --c-ink-50: 242 243 250;
+  --c-ink-100: 227 229 245;
+  --c-ink-200: 199 203 238;
+  --c-ink-300: 164 171 219;
+  --c-ink-400: 118 126 189;
+  --c-ink-500: 88 95 149;
+  --c-ink-600: 65 71 114;
+  --c-ink-700: 44 48 84;
+  --c-ink-800: 29 32 64;
+  --c-ink-900: 20 22 49;
+  --c-ink-950: 14 16 35;
+}
+
+/* Sage Press — calm and botanical: forest ink, sage accent, paper surface. */
+[data-theme="sage"] {
+  --c-obsidian: 16 23 17;
+  --c-antique-gold: 143 174 139;
+  --c-warm-ivory: 245 248 244;
+  --c-deep-gold: 70 112 74;
+  --c-ivory-dim: 228 237 226;
+  --c-warm-brick: 179 90 60;
+  --c-brick-light: 229 154 119;
+  --c-ink-50: 245 248 244;
+  --c-ink-100: 228 237 226;
+  --c-ink-200: 201 220 198;
+  --c-ink-300: 165 196 161;
+  --c-ink-400: 119 161 115;
+  --c-ink-500: 91 132 88;
+  --c-ink-600: 70 104 74;
+  --c-ink-700: 51 77 56;
+  --c-ink-800: 31 50 38;
+  --c-ink-900: 21 34 24;
+  --c-ink-950: 16 23 17;
+}
+
+/* Plum Dusk — warm violet: deep plum ink, dusty rose accent, blush surface. */
+[data-theme="plum"] {
+  --c-obsidian: 23 16 29;
+  --c-antique-gold: 198 154 177;
+  --c-warm-ivory: 248 242 245;
+  --c-deep-gold: 125 78 104;
+  --c-ivory-dim: 236 223 230;
+  --c-warm-brick: 169 68 56;
+  --c-brick-light: 226 141 124;
+  --c-ink-50: 248 242 245;
+  --c-ink-100: 236 223 230;
+  --c-ink-200: 220 194 208;
+  --c-ink-300: 196 158 173;
+  --c-ink-400: 155 113 134;
+  --c-ink-500: 124 86 105;
+  --c-ink-600: 96 66 83;
+  --c-ink-700: 70 47 60;
+  --c-ink-800: 44 29 39;
+  --c-ink-900: 29 20 32;
+  --c-ink-950: 23 16 29;
 }
 
 @layer base {
@@ -25,7 +112,7 @@
   }
   html, body, #root { height: 100%; }
   body { @apply bg-ivory-dim text-obsidian dark:bg-obsidian dark:text-warm-ivory; }
-  ::selection { background: rgba(198, 161, 91, 0.35); }
+  ::selection { background: rgb(var(--c-antique-gold) / 0.35); }
   :focus-visible { @apply outline-none ring-2 ring-antique-gold ring-offset-2 ring-offset-warm-ivory dark:ring-antique-gold dark:ring-offset-obsidian; }
   input, select, textarea, button { font: inherit; }
   .tabular-nums { font-family: 'JetBrains Mono', ui-monospace, monospace; }
@@ -37,17 +124,48 @@
   .dark .skeleton::after { background-image: linear-gradient(90deg, transparent, rgba(244,240,231,.06), transparent); }
   .font-display { font-family: 'Cormorant Garamond', Georgia, serif; }
   .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  /* Brand lock — the GENJI mark keeps its identity in every theme. */
+  .brand-text { color: rgb(var(--brand-ink)); }
+  .dark .brand-text { color: rgb(var(--brand-ivory)); }
+  .brand-accent { color: rgb(var(--brand-gold)); }
+  .brand-tile { background: rgb(var(--brand-ink)); color: rgb(var(--brand-ivory)); }
+  .dark .brand-tile { background: rgb(var(--brand-ivory)); color: rgb(var(--brand-ink)); }
 }
 
 @keyframes cardPulse {
-  0% { box-shadow: 0 0 0 0 rgba(198,161,91,.45); }
-  60% { box-shadow: 0 0 0 10px rgba(198,161,91,0); }
-  100% { box-shadow: 0 0 0 0 rgba(198,161,91,0); }
+  0% { box-shadow: 0 0 0 0 rgb(var(--c-antique-gold) / 0.45); }
+  60% { box-shadow: 0 0 0 10px rgb(var(--c-antique-gold) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--c-antique-gold) / 0); }
 }
 @keyframes rowSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
-* { scrollbar-width: thin; scrollbar-color: #b9ae9a transparent; }
-.dark * { scrollbar-color: #403c35 transparent; }
+* { scrollbar-width: thin; scrollbar-color: rgb(var(--c-ink-300)) transparent; }
+.dark * { scrollbar-color: rgb(var(--c-ink-600)) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: #b9ae9a; border-radius: 4px; }
-.dark *::-webkit-scrollbar-thumb { background: #403c35; }
+*::-webkit-scrollbar-thumb { background: rgb(var(--c-ink-300)); border-radius: 4px; }
+.dark *::-webkit-scrollbar-thumb { background: rgb(var(--c-ink-600)); }
+
+/* Printed output (e.g. login cards) stays high-contrast in greyscale
+   regardless of theme: pin every token to the Genji values in print. */
+@media print {
+  html, html[data-theme="indigo"], html[data-theme="sage"], html[data-theme="plum"] {
+    --c-obsidian: 11 13 16;
+    --c-antique-gold: 198 161 91;
+    --c-warm-ivory: 244 240 231;
+    --c-deep-gold: 139 106 49;
+    --c-ivory-dim: 234 227 210;
+    --c-warm-brick: 156 66 48;
+    --c-brick-light: 224 138 115;
+    --c-ink-50: 244 240 231;
+    --c-ink-100: 234 227 210;
+    --c-ink-200: 216 207 189;
+    --c-ink-300: 185 174 154;
+    --c-ink-400: 129 121 107;
+    --c-ink-500: 93 87 78;
+    --c-ink-600: 64 60 53;
+    --c-ink-700: 41 39 34;
+    --c-ink-800: 20 23 28;
+    --c-ink-900: 15 18 22;
+    --c-ink-950: 11 13 16;
+  }
+}

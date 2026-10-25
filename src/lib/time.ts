@@ -21,3 +21,25 @@ export function formatDate(ts: number): string {
     year: "numeric",
   });
 }
+
+/** Date + time, used for quiz due dates. */
+export function formatDateTime(ts: number): string {
+  const d = new Date(ts);
+  return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}, ${d.toLocaleTimeString(
+    [],
+    { hour: "2-digit", minute: "2-digit" },
+  )}`;
+}
+
+/** Relative future hint, e.g. "Due in 2 days" / "Due in 3 hours". */
+export function relativeUntil(ts: number): string {
+  const ms = ts - Date.now();
+  if (ms <= 0) return "past due";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return `in ${Math.max(1, minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `in ${hours} ${hours === 1 ? "hour" : "hours"}`;
+  const days = Math.floor(hours / 24);
+  if (days < 14) return `in ${days} ${days === 1 ? "day" : "days"}`;
+  return `in ${Math.floor(days / 7)} weeks`;
+}

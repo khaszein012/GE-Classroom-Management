@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive, ArchiveRestore, Minus, PackageX, Pencil, Plus, Store as StoreIcon, Trash2, Upload, X,
 } from "lucide-react";
-import type { Reward } from "@/types";
+import type { Reward, RewardCurrency } from "@/types";
 import type { Store } from "@/lib/useStore";
 import * as storage from "@/lib/storage";
 import { useToast } from "@/components/Toast";
@@ -10,7 +10,7 @@ import { Modal } from "@/components/Modal";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Skeleton } from "@/components/Skeleton";
 import { useCurrency } from "@/components/CurrencyProvider";
-import { CurrencyAmount } from "@/components/CurrencyAmount";
+import { CurrencyAmount, CurrencyIcon } from "@/components/CurrencyAmount";
 import { RequestsPanel } from "@/components/RequestsPanel";
 import { RewardThumbnail } from "@/components/RewardThumbnail";
 import { uploadRewardImage, removeRewardImage } from "@/lib/rewardImage";
@@ -28,11 +28,15 @@ export function RewardsScreen({ store }: Props) {
     id?: string;
     name: string;
     description: string;
+    currency: RewardCurrency;
     cost: string;
     unlimited: boolean;
     stock: string;
     imageUrl: string | null;
   } | null>(null);
+  // While pending requests exist, the database refuses a currency change;
+  // the picker is disabled and explains why instead of failing silently.
+  const [currencyLocked, setCurrencyLocked] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const rewards: Reward[] = store.rewards;
@@ -45,19 +49,28 @@ export function RewardsScreen({ store }: Props) {
     [rewards],
   );
 
-  const openAdd = () =>
-    setEditing({ name: "", description: "", cost: "10", unlimited: true, stock: "0", imageUrl: null });
+  const openAdd = () => {
+    setCurrencyLocked(false);
+    setEditing({ name: "", description: "", currency: "dollars", cost: "10", unlimited: true, stock: "0", imageUrl: null });
+  };
 
-  const openEdit = (r: Reward) =>
+  const openEdit = (r: Reward) => {
     setEditing({
       id: r.id,
       name: r.name,
       description: r.description ?? "",
+      currency: r.currency,
       cost: String(r.cost),
       unlimited: r.stock === null,
       stock: r.stock === null ? "0" : String(r.stock),
       imageUrl: r.imageUrl,
     });
+    setCurrencyLocked(false);
+    storage
+      .rewardHasPendingRequests(r.id)
+      .then(setCurrencyLocked)
+      .catch(() => setCurrencyLocked(false));
+  };
 
   const save = async () => {
     if (!editing) return;
@@ -73,17 +86,26 @@ export function RewardsScreen({ store }: Props) {
           name,
           description: editing.description,
           cost,
+          currency: editing.currency,
           stock,
           imageUrl: editing.imageUrl,
         });
         toast.show("Reward updated", "positive");
       } else {
-        await store.addReward({ name, description: editing.description, cost, stock, imageUrl: editing.imageUrl });
+        await store.addReward({
+          name,
+          description: editing.description,
+          cost,
+          currency: editing.currency,
+          stock,
+          imageUrl: editing.imageUrl,
+        });
         toast.show(`${name} added to the shop`, "positive");
       }
       setEditing(null);
-    } catch {
-      toast.show("Could not save the reward", "negative");
+    } catch (e) {
+      // e.g. the DB guard: currency can't change while requests are pending.
+      toast.show(e instanceof Error ? e.message : "Could not save the reward", "negative");
     }
   };
 
@@ -161,7 +183,8 @@ export function RewardsScreen({ store }: Props) {
           <div>
             <h1 className="text-[28px] font-semibold leading-tight text-ink-900 dark:text-warm-ivory">Rewards</h1>
             <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-              The shop your students spend {config.behavior.plural.toLowerCase()} in
+              The shop your students spend {config.behavior.plural.toLowerCase()} and{" "}
+              {config.achievement.plural.toLowerCase()} in
             </p>
           </div>
           <button
@@ -249,7 +272,11 @@ export function RewardsScreen({ store }: Props) {
                         <div className="truncate text-sm font-semibold text-ink-700 dark:text-ink-300">{r.name}</div>
                       </div>
                       <div className="text-xs text-ink-400 dark:text-ink-500">
-                        <CurrencyAmount amount={r.cost} iconClassName="h-3 w-3" />
+                        <CurrencyAmount
+                          amount={r.cost}
+                          kind={r.currency === "gems" ? "achievement" : "behavior"}
+                          iconClassName="h-3 w-3"
+                        />
                         {r.stock === null ? " · unlimited" : ` · stock ${r.stock}`}
                       </div>
                     </div>
@@ -279,6 +306,7 @@ export function RewardsScreen({ store }: Props) {
         {editing && (
           <RewardForm
             value={editing}
+            currencyLocked={currencyLocked}
             onChange={(patch) => setEditing((prev) => (prev ? { ...prev, ...patch } : prev))}
           />
         )}
@@ -346,20 +374,20 @@ function RewardRowItem({
           : "border-ink-200 hover:border-ink-300 dark:border-ink-800/70 dark:hover:border-ink-700"
       } ${soldOut ? "opacity-60" : ""} ${busy ? "opacity-50" : ""}`}
     >
-      <div className="flex shrink-0 flex-col">
+      <div className="flex shrink-0 flex-col gap-0.5">
         <button
           onClick={() => onMove("up")}
           disabled={first}
-          className="flex h-4 w-6 items-center justify-center rounded text-ink-300 hover:bg-ink-100 hover:text-ink-600 disabled:opacity-30 dark:text-ink-600 dark:hover:bg-ink-800"
-          aria-label="Move up"
+          className="flex h-7 w-11 items-center justify-center rounded text-ink-300 hover:bg-ink-100 hover:text-ink-600 disabled:opacity-30 dark:text-ink-600 dark:hover:bg-ink-800"
+          aria-label={`Move ${r.name} up`}
         >
           <span className="text-[10px] font-bold leading-none">▲</span>
         </button>
         <button
           onClick={() => onMove("down")}
           disabled={last}
-          className="flex h-4 w-6 items-center justify-center rounded text-ink-300 hover:bg-ink-100 hover:text-ink-600 disabled:opacity-30 dark:text-ink-600 dark:hover:bg-ink-800"
-          aria-label="Move down"
+          className="flex h-7 w-11 items-center justify-center rounded text-ink-300 hover:bg-ink-100 hover:text-ink-600 disabled:opacity-30 dark:text-ink-600 dark:hover:bg-ink-800"
+          aria-label={`Move ${r.name} down`}
         >
           <span className="text-[10px] font-bold leading-none">▼</span>
         </button>
@@ -391,7 +419,11 @@ function RewardRowItem({
       </div>
 
       <span className="shrink-0 rounded-full bg-ivory-dim px-2.5 py-1 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
-        <CurrencyAmount amount={r.cost} iconClassName="h-3.5 w-3.5" />
+        <CurrencyAmount
+          amount={r.cost}
+          kind={r.currency === "gems" ? "achievement" : "behavior"}
+          iconClassName="h-3.5 w-3.5"
+        />
       </span>
 
       <div className="flex shrink-0 items-center gap-1">
@@ -402,8 +434,8 @@ function RewardRowItem({
             <button
               onClick={() => onAdjustStock(-1)}
               disabled={r.stock === 0 || busy}
-              className="flex h-8 w-8 items-center justify-center rounded-button bg-ink-100 text-ink-600 hover:bg-ink-200 disabled:opacity-40 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
-              aria-label="Decrease stock"
+              className="flex h-9 w-9 items-center justify-center rounded-button bg-ink-100 text-ink-600 hover:bg-ink-200 disabled:opacity-40 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
+              aria-label={`Decrease stock of ${r.name}`}
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -413,8 +445,8 @@ function RewardRowItem({
             <button
               onClick={() => onAdjustStock(1)}
               disabled={busy}
-              className="flex h-8 w-8 items-center justify-center rounded-button bg-ink-100 text-ink-600 hover:bg-ink-200 disabled:opacity-40 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
-              aria-label="Increase stock"
+              className="flex h-9 w-9 items-center justify-center rounded-button bg-ink-100 text-ink-600 hover:bg-ink-200 disabled:opacity-40 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
+              aria-label={`Increase stock of ${r.name}`}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -423,7 +455,7 @@ function RewardRowItem({
                 onClick={onSoldOut}
                 disabled={busy}
                 title="Mark sold out"
-                className="flex h-8 w-8 items-center justify-center rounded-button text-ink-400 hover:bg-warm-brick/10 hover:text-warm-brick disabled:opacity-40 dark:hover:bg-warm-brick/10"
+                className="flex h-9 w-9 items-center justify-center rounded-button text-ink-400 hover:bg-warm-brick/10 hover:text-warm-brick disabled:opacity-40 dark:hover:bg-warm-brick/10"
                 aria-label={`Mark ${r.name} sold out`}
               >
                 <PackageX className="h-4 w-4" />
@@ -469,10 +501,12 @@ function RewardRowItem({
 
 function RewardForm({
   value,
+  currencyLocked,
   onChange,
 }: {
-  value: { id?: string; name: string; description: string; cost: string; unlimited: boolean; stock: string; imageUrl: string | null };
-  onChange: (patch: { name?: string; description?: string; cost?: string; unlimited?: boolean; stock?: string; imageUrl?: string | null }) => void;
+  value: { id?: string; name: string; description: string; currency: RewardCurrency; cost: string; unlimited: boolean; stock: string; imageUrl: string | null };
+  currencyLocked: boolean;
+  onChange: (patch: { name?: string; description?: string; currency?: RewardCurrency; cost?: string; unlimited?: boolean; stock?: string; imageUrl?: string | null }) => void;
 }) {
   const { config } = useCurrency();
   const [nameError, setNameError] = useState("");
@@ -486,10 +520,13 @@ function RewardForm({
 
   if (!tempIdRef.current) tempIdRef.current = `temp-${Date.now()}`;
 
+  const priceCurrency = value.currency === "gems" ? config.achievement : config.behavior;
+  const priceName = (n: number) => (n === 1 ? priceCurrency.singular.toLowerCase() : priceCurrency.plural.toLowerCase());
+
   const validate = () => {
     setNameError(value.name.trim() ? "" : "Name is required");
     const cost = parseInt(value.cost, 10);
-    setCostError(Number.isNaN(cost) || cost < 1 ? `Must cost at least 1 ${config.behavior.singular.toLowerCase()}` : "");
+    setCostError(Number.isNaN(cost) || cost < 1 ? `Must cost at least 1 ${priceName(1)}` : "");
     if (!value.unlimited) {
       const stock = parseInt(value.stock, 10);
       setStockError(Number.isNaN(stock) || stock < 0 ? "Stock cannot be negative" : "");
@@ -608,6 +645,45 @@ function RewardForm({
       </div>
 
       <div>
+        <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
+          Currency
+        </label>
+        <div
+          className="flex rounded-button border border-ink-200 bg-warm-ivory p-1 dark:border-ink-700 dark:bg-ink-800"
+          role="group"
+          aria-label="Reward currency"
+        >
+          {(["dollars", "gems"] as RewardCurrency[]).map((c) => {
+            const settings = c === "gems" ? config.achievement : config.behavior;
+            const selected = value.currency === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onChange({ currency: c })}
+                disabled={currencyLocked}
+                aria-pressed={selected}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-button px-3 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                  selected
+                    ? "bg-obsidian text-warm-ivory dark:bg-antique-gold dark:text-obsidian"
+                    : "text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
+                }`}
+              >
+                <CurrencyIcon name={settings.icon} className="h-4 w-4" aria-hidden />
+                {settings.plural}
+              </button>
+            );
+          })}
+        </div>
+        {currencyLocked && (
+          <p className="mt-1.5 text-xs text-warm-brick dark:text-brick-light">
+            Students have pending requests for this reward, so its currency is locked until
+            they're decided.
+          </p>
+        )}
+      </div>
+
+      <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">Cost</label>
         <div className="flex items-center gap-2">
           <input
@@ -616,9 +692,12 @@ function RewardForm({
             value={value.cost}
             onChange={(e) => onChange({ cost: e.target.value })}
             onBlur={validate}
-            className="h-11 w-28 rounded-button border border-ink-200 bg-warm-ivory px-3 text-center text-lg font-bold outline-none focus:border-antique-gold focus:ring-2 focus:ring-antique-gold/20 dark:border-ink-700 dark:bg-ink-800 dark:focus:ring-antique-gold/20"
+            className="h-11 w-28 rounded-button border border-ink-200 bg-warm-ivory px-3 text-center font-mono text-lg font-bold tabular-nums outline-none focus:border-antique-gold focus:ring-2 focus:ring-antique-gold/20 dark:border-ink-700 dark:bg-ink-800 dark:focus:ring-antique-gold/20"
           />
-          <span className="text-sm text-ink-500 dark:text-ink-400">{config.behavior.plural}</span>
+          <span className="flex items-center gap-1 text-sm text-ink-500 dark:text-ink-400">
+            <CurrencyIcon name={priceCurrency.icon} className="h-4 w-4" aria-hidden />
+            {priceCurrency.plural}
+          </span>
         </div>
         {costError && <p className="mt-1 text-xs text-warm-brick">{costError}</p>}
       </div>
