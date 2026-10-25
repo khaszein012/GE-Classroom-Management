@@ -279,6 +279,22 @@ export function useStore() {
     [refreshQuizzes],
   );
 
+  const setQuizArchived = useCallback(
+    async (id: string, archived: boolean) => {
+      await storage.setQuizArchived(id, archived);
+      await refreshQuizzes();
+    },
+    [refreshQuizzes],
+  );
+
+  const reopenQuiz = useCallback(
+    async (id: string, dueAt: number) => {
+      await storage.reopenQuiz(id, dueAt);
+      await refreshQuizzes();
+    },
+    [refreshQuizzes],
+  );
+
   return {
     students,
     behaviors,
@@ -315,6 +331,8 @@ export function useStore() {
     saveQuiz,
     setQuizStatus,
     deleteQuiz,
+    setQuizArchived,
+    reopenQuiz,
     refreshQuizzes,
     refresh,
   };

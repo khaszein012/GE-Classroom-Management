@@ -112,6 +112,9 @@ export interface Quiz {
   maxGems: number;
   dueAt: number;
   status: QuizStatus;
+  /** NULL = not archived. Archived quizzes are hidden from students and
+   *  filed under the teacher list's Archived section. */
+  archivedAt: number | null;
   createdAt: number;
 }
 

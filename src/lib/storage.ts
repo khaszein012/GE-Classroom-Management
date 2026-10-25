@@ -637,6 +637,7 @@ export interface QuizRow {
   max_gems: number;
   due_at: string;
   status: QuizStatus;
+  archived_at: string | null;
   created_at: string;
 }
 
@@ -648,6 +649,7 @@ function rowToQuiz(r: QuizRow): Quiz {
     maxGems: r.max_gems,
     dueAt: new Date(r.due_at).getTime(),
     status: r.status,
+    archivedAt: r.archived_at ? new Date(r.archived_at).getTime() : null,
     createdAt: new Date(r.created_at).getTime(),
   };
 }
@@ -828,6 +830,25 @@ export async function saveQuizAssignments(quizId: string, studentIds: string[]):
 
 export async function setQuizStatus(id: string, status: QuizStatus): Promise<void> {
   const { error } = await supabase.from("quizzes").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+/** Archive (or restore) a quiz. Archived quizzes are hidden from students
+ *  entirely and filed under the teacher list's Archived section. */
+export async function setQuizArchived(id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("quizzes")
+    .update({ archived_at: archived ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Reopen a closed quiz as published with a fresh future due date. */
+export async function reopenQuiz(id: string, dueAt: number): Promise<void> {
+  const { error } = await supabase
+    .from("quizzes")
+    .update({ status: "published", due_at: new Date(dueAt).toISOString() })
+    .eq("id", id);
   if (error) throw error;
 }
 

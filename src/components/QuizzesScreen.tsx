@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Archive,
+  ArchiveRestore,
   BarChart3,
   CalendarClock,
   ClipboardList,
@@ -7,6 +9,7 @@ import {
   Pencil,
   Plus,
   Rocket,
+  RotateCcw,
   Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +18,7 @@ import type { QuizSummary } from "@/types";
 import { formatDateTime, relativeUntil } from "@/lib/time";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Skeleton } from "@/components/Skeleton";
 import { QuizEditor } from "@/components/QuizEditor";
@@ -44,6 +48,13 @@ export function QuizzesScreen({ store }: Props) {
   return <QuizList store={store} onEdit={(quizId) => setMode({ view: "editor", quizId })} onResults={(quizId) => setMode({ view: "results", quizId })} onNew={() => setMode({ view: "editor" })} />;
 }
 
+/** datetime-local input value for a timestamp (local timezone). */
+function toLocalInputValue(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function QuizList({
   store,
   onEdit,
@@ -61,6 +72,10 @@ function QuizList({
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [reopenFor, setReopenFor] = useState<QuizSummary | null>(null);
+  const [reopenDue, setReopenDue] = useState("");
+  const [reopenError, setReopenError] = useState<string | null>(null);
 
   // Live list: quizzes, attempts and assignments push changes straight in,
   // so submissions and status changes appear without a manual refresh.
@@ -123,6 +138,11 @@ function QuizList({
     );
   }
 
+  const active = quizzes.filter((q) => q.archivedAt === null);
+  const archived = quizzes
+    .filter((q) => q.archivedAt !== null)
+    .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
+
   const publish = (quiz: QuizSummary) => {
     confirm({
       title: "Publish quiz?",
@@ -150,7 +170,7 @@ function QuizList({
       message: (
         <>
           <strong>{quiz.title}</strong> stops accepting submissions immediately, even before
-          the due date. Results stay available.
+          the due date. You can reopen it with a new due date at any time.
         </>
       ),
       confirmLabel: "Close quiz",
@@ -163,6 +183,36 @@ function QuizList({
           .finally(() => setBusyId(null));
       },
     });
+  };
+
+  const archive = (quiz: QuizSummary) => {
+    confirm({
+      title: "Archive quiz?",
+      message: (
+        <>
+          <strong>{quiz.title}</strong> is hidden from students and moved out of your list.
+          Results are kept and you can restore it anytime.
+        </>
+      ),
+      confirmLabel: "Archive",
+      onConfirm: () => {
+        setBusyId(quiz.id);
+        store
+          .setQuizArchived(quiz.id, true)
+          .then(() => toast.show(`"${quiz.title}" archived`, "info"))
+          .catch(() => toast.show("Could not archive — try again", "negative"))
+          .finally(() => setBusyId(null));
+      },
+    });
+  };
+
+  const restore = (quiz: QuizSummary) => {
+    setBusyId(quiz.id);
+    store
+      .setQuizArchived(quiz.id, false)
+      .then(() => toast.show(`"${quiz.title}" restored`, "positive"))
+      .catch(() => toast.show("Could not restore — try again", "negative"))
+      .finally(() => setBusyId(null));
   };
 
   const remove = (quiz: QuizSummary) => {
@@ -189,6 +239,37 @@ function QuizList({
     });
   };
 
+  const openReopen = (quiz: QuizSummary) => {
+    // Default: the original due date if still in the future, otherwise tomorrow.
+    const fallback = Date.now() + 24 * 60 * 60 * 1000;
+    setReopenDue(toLocalInputValue(quiz.dueAt > Date.now() ? quiz.dueAt : fallback));
+    setReopenError(null);
+    setReopenFor(quiz);
+  };
+
+  const confirmReopen = async () => {
+    if (!reopenFor) return;
+    const dueMs = new Date(reopenDue).getTime();
+    if (Number.isNaN(dueMs)) {
+      setReopenError("Pick a due date and time.");
+      return;
+    }
+    if (dueMs <= Date.now()) {
+      setReopenError("The new due date must be in the future.");
+      return;
+    }
+    setBusyId(reopenFor.id);
+    try {
+      await store.reopenQuiz(reopenFor.id, dueMs);
+      toast.show(`"${reopenFor.title}" reopened`, "positive");
+      setReopenFor(null);
+    } catch {
+      setReopenError("Could not reopen the quiz — try again.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-[1400px] px-5 py-6 sm:px-8 sm:py-8">
@@ -198,9 +279,9 @@ function QuizList({
               Quizzes
             </h1>
             <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-              {quizzes.length === 0
+              {active.length === 0 && archived.length === 0
                 ? `Build quizzes to award ${gems.plural.toLowerCase()}`
-                : `${quizzes.length} ${quizzes.length === 1 ? "quiz" : "quizzes"} · sorted by due date`}
+                : `${active.length} ${active.length === 1 ? "quiz" : "quizzes"} · sorted by due date${archived.length > 0 ? ` · ${archived.length} archived` : ""}`}
             </p>
           </div>
           {students.length > 0 && (
@@ -215,7 +296,7 @@ function QuizList({
         </header>
 
         <div className="mt-6 pb-8">
-          {quizzes.length === 0 ? (
+          {active.length === 0 && archived.length === 0 ? (
             students.length === 0 ? (
               <EmptyState
                 title="Add students first"
@@ -237,9 +318,13 @@ function QuizList({
                 }
               />
             )
+          ) : active.length === 0 ? (
+            <p className="rounded-card border-2 border-dashed border-ink-200 py-10 text-center text-sm text-ink-500 dark:border-ink-700 dark:text-ink-400">
+              No active quizzes. {archived.length > 0 && "Restore one from the archive below, or create a new quiz."}
+            </p>
           ) : (
             <ul className="space-y-3">
-              {quizzes.map((quiz) => (
+              {active.map((quiz) => (
                 <QuizRow
                   key={quiz.id}
                   quiz={quiz}
@@ -248,13 +333,113 @@ function QuizList({
                   onResults={() => onResults(quiz.id)}
                   onPublish={() => publish(quiz)}
                   onClose={() => close(quiz)}
+                  onReopen={() => openReopen(quiz)}
+                  onArchive={() => archive(quiz)}
                   onDelete={() => remove(quiz)}
                 />
               ))}
             </ul>
           )}
+
+          {archived.length > 0 && (
+            <div className="mt-6 border-t border-ink-100 pt-4 dark:border-ink-800">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-500 dark:text-ink-600">
+                  Archived — hidden from students, history kept
+                </h2>
+                <button
+                  onClick={() => setShowArchived((v) => !v)}
+                  className="flex h-9 items-center gap-1.5 rounded-button border border-ink-200 px-2.5 text-xs font-semibold text-ink-600 transition-colors hover:bg-ink-100 dark:border-ink-700 dark:text-ink-300 dark:hover:bg-ink-800"
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  {showArchived ? "Hide archived" : `Show archived (${archived.length})`}
+                </button>
+              </div>
+              {showArchived && (
+                <ul className="space-y-2">
+                  {archived.map((quiz) => (
+                    <li
+                      key={quiz.id}
+                      className={`flex flex-wrap items-center gap-3 rounded-button border border-ink-100 bg-ink-50/50 px-3 py-2.5 dark:border-ink-800 dark:bg-ink-800/30 ${
+                        busyId === quiz.id ? "opacity-50" : ""
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-ink-700 dark:text-ink-300">
+                            {quiz.title}
+                          </span>
+                          <StatusChip status={quiz.status} />
+                        </div>
+                        <div className="text-xs text-ink-400 dark:text-ink-500">
+                          {quiz.submittedCount} of {quiz.assignedCount} submitted
+                          {quiz.submittedCount > 0 && " · results kept"}
+                        </div>
+                      </div>
+                      {quiz.status !== "draft" && (
+                        <ActionButton
+                          label="Results"
+                          icon={<BarChart3 className="h-4 w-4" />}
+                          onClick={() => onResults(quiz.id)}
+                          disabled={busyId === quiz.id}
+                        />
+                      )}
+                      <ActionButton
+                        label="Restore"
+                        icon={<ArchiveRestore className="h-4 w-4" />}
+                        onClick={() => restore(quiz)}
+                        disabled={busyId === quiz.id}
+                      />
+                      <ActionButton
+                        label="Delete"
+                        icon={<Trash2 className="h-4 w-4" />}
+                        onClick={() => remove(quiz)}
+                        danger
+                        disabled={busyId === quiz.id}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Reopen a closed quiz with a fresh due date */}
+      <Modal
+        open={reopenFor !== null}
+        title="Reopen quiz"
+        onClose={() => setReopenFor(null)}
+        onConfirm={() => void confirmReopen()}
+        confirmLabel="Reopen"
+      >
+        {reopenFor && (
+          <div className="space-y-3">
+            <p className="text-sm text-ink-600 dark:text-ink-300">
+              <strong>{reopenFor.title}</strong> becomes available to its assigned students
+              again. Students who already attempted keep their result — the new due date only
+              opens the door for everyone else.
+            </p>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
+                New due date and time
+              </label>
+              <input
+                type="datetime-local"
+                value={reopenDue}
+                onChange={(e) => {
+                  setReopenDue(e.target.value);
+                  setReopenError(null);
+                }}
+                className="h-11 w-full rounded-button border border-ink-200 bg-warm-ivory px-3 text-sm outline-none transition-colors focus:border-antique-gold focus:ring-2 focus:ring-antique-gold/20 dark:border-ink-700 dark:bg-ink-800 dark:[color-scheme:dark]"
+              />
+              {reopenError && <p className="mt-1 text-xs text-warm-brick">{reopenError}</p>}
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {dialog}
     </div>
   );
@@ -267,6 +452,8 @@ function QuizRow({
   onResults,
   onPublish,
   onClose,
+  onReopen,
+  onArchive,
   onDelete,
 }: {
   quiz: QuizSummary;
@@ -275,6 +462,8 @@ function QuizRow({
   onResults: () => void;
   onPublish: () => void;
   onClose: () => void;
+  onReopen: () => void;
+  onArchive: () => void;
   onDelete: () => void;
 }) {
   const overdue = quiz.dueAt < Date.now();
@@ -322,10 +511,14 @@ function QuizRow({
           {quiz.status === "published" && (
             <ActionButton label="Close" icon={<Lock className="h-4 w-4" />} onClick={onClose} disabled={busy} />
           )}
+          {quiz.status === "closed" && (
+            <ActionButton label="Reopen" icon={<RotateCcw className="h-4 w-4" />} onClick={onReopen} disabled={busy} />
+          )}
           {quiz.status !== "draft" && (
             <ActionButton label="Results" icon={<BarChart3 className="h-4 w-4" />} onClick={onResults} disabled={busy} />
           )}
           <ActionButton label="Edit" icon={<Pencil className="h-4 w-4" />} onClick={onEdit} disabled={busy} />
+          <ActionButton label="Archive" icon={<Archive className="h-4 w-4" />} onClick={onArchive} disabled={busy} />
           <ActionButton label="Delete" icon={<Trash2 className="h-4 w-4" />} onClick={onDelete} danger disabled={busy} />
         </div>
       </div>
