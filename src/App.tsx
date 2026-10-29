@@ -4,6 +4,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { StudentsScreen } from "@/components/StudentsScreen";
 import { BehaviorsScreen } from "@/components/BehaviorsScreen";
 import { ActivityLogScreen } from "@/components/ActivityLogScreen";
+import { InsightsScreen } from "@/components/InsightsScreen";
 import { RewardsScreen } from "@/components/RewardsScreen";
 // Quizzes screens are code-split: the builder, editor and results are the
 // heaviest views and are rarely a session's first destination.
@@ -46,6 +47,7 @@ const SCREEN_TITLES: Record<Screen, string> = {
   rewards: "Rewards",
   quizzes: "Quizzes",
   activity: "Activity Log",
+  insights: "Insights",
   settings: "Settings",
 };
 
@@ -143,6 +145,7 @@ function MainApp({
               </Suspense>
             )}
             {screen === "activity" && <ActivityLogScreen store={store} />}
+            {screen === "insights" && <InsightsScreen store={store} />}
             {screen === "settings" && (
               <SettingsScreen
                 config={config}
