@@ -112,11 +112,19 @@ function NavItems({ current, onNavigate, pendingCount = 0 }: NavItemsProps) {
                 : "border-l-[3px] border-transparent text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100"
             }`}
           >
-            <Icon
-              className={`h-[18px] w-[18px] shrink-0 ${
-                active ? "text-deep-gold dark:text-antique-gold" : "text-ink-400 group-hover:text-ink-700 dark:group-hover:text-ink-200"
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                active
+                  ? "bg-warm-ivory shadow-soft dark:bg-ink-900/70"
+                  : "bg-transparent"
               }`}
-            />
+            >
+              <Icon
+                className={`h-[18px] w-[18px] ${
+                  active ? "text-deep-gold dark:text-antique-gold" : "text-ink-400 group-hover:text-ink-700 dark:group-hover:text-ink-200"
+                }`}
+              />
+            </span>
             {item.label}
             {item.id === "rewards" && pendingCount > 0 && (
               <span

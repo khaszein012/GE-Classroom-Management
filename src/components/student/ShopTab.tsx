@@ -444,7 +444,7 @@ function RewardGrid({
         return (
           <li
             key={r.id}
-            className={`flex flex-col rounded-card border bg-warm-ivory p-4 shadow-soft transition-colors dark:bg-ink-900 ${
+            className={`hover-lift flex flex-col rounded-card border bg-warm-ivory p-4 shadow-soft transition-colors dark:bg-ink-900 ${
               soldOut
                 ? "border-ink-100 opacity-60 dark:border-ink-800/60"
                 : "border-ink-200/70 dark:border-ink-800/70"

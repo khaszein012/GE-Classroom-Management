@@ -50,27 +50,52 @@ export default {
         'earth-12': '#0b0d10',
       },
       borderRadius: {
-        DEFAULT: '5px',
-        button: '5px',
-        card: '6px',
+        DEFAULT: '8px',
+        button: '10px',
+        card: '14px',
       },
       boxShadow: {
-        soft: '0 1px 2px rgba(11, 13, 16, 0.06)',
-        'soft-md': '0 2px 8px rgba(11, 13, 16, 0.08)',
-        'soft-lg': '0 8px 24px rgba(11, 13, 16, 0.12)',
+        // Warm-tinted shadows (brown-black, not pure black) so elevation
+        // feels gilded rather than grey — in every theme.
+        soft: '0 1px 2px rgba(64, 50, 20, 0.07)',
+        'soft-md': '0 3px 10px rgba(64, 50, 20, 0.10)',
+        'soft-lg': '0 14px 36px rgba(64, 50, 20, 0.16)',
       },
       keyframes: {
-        'fade-scale-in': { from: { opacity: '0', transform: 'scale(0.98)' }, to: { opacity: '1', transform: 'scale(1)' } },
+        'fade-scale-in': { from: { opacity: '0', transform: 'scale(0.96)' }, to: { opacity: '1', transform: 'scale(1)' } },
         'slide-up': { from: { opacity: '0', transform: 'translateY(12px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
         'slide-in-right': { from: { opacity: '0', transform: 'translateX(20px)' }, to: { opacity: '1', transform: 'translateX(0)' } },
         'slide-in-left': { from: { opacity: '0', transform: 'translateX(-100%)' }, to: { opacity: '1', transform: 'translateX(0)' } },
         skeleton: { '100%': { transform: 'translateX(100%)' } },
+        // Gilded Classroom additions
+        shine: {
+          '0%': { transform: 'translateX(-130%) skewX(-14deg)' },
+          '100%': { transform: 'translateX(230%) skewX(-14deg)' },
+        },
+        'confetti-fall': {
+          from: { transform: 'translateY(-8vh) rotate(0deg)', opacity: '1' },
+          to: { transform: 'translateY(108vh) rotate(var(--rot))', opacity: '0.9' },
+        },
+        'toast-pop': {
+          from: { opacity: '0', transform: 'translateY(-10px) scale(0.95)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'rule-in': { from: { transform: 'scaleX(0)' }, to: { transform: 'scaleX(1)' } },
+        'medal-pop': {
+          '0%': { transform: 'scale(0.5)', opacity: '0' },
+          '60%': { transform: 'scale(1.12)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
       },
       animation: {
-        'fade-scale-in': 'fade-scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'fade-scale-in': 'fade-scale-in 220ms cubic-bezier(0.34, 1.4, 0.64, 1)',
         'slide-up': 'slide-up 180ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-in-right': 'slide-in-right 200ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-in-left': 'slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+        shine: 'shine 1.1s ease 0.15s 1 both',
+        'toast-pop': 'toast-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'rule-in': 'rule-in 800ms cubic-bezier(0.22, 1, 0.36, 1) 0.2s both',
+        'medal-pop': 'medal-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
     },
   },

@@ -61,7 +61,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   const Icon = toneConfig.icon;
 
   return (
-    <div className="pointer-events-auto flex w-full animate-slide-in-right items-center gap-3 overflow-hidden rounded-card bg-warm-ivory py-3 pl-3 pr-2 shadow-soft-lg sm:w-72 dark:bg-ink-800">
+    <div className="pointer-events-auto flex w-full animate-toast-pop items-center gap-3 overflow-hidden rounded-card bg-warm-ivory py-3 pl-3 pr-2 shadow-soft-lg sm:w-72 dark:bg-ink-800">
       <div className={`h-9 w-1 shrink-0 rounded-full ${toneConfig.bar}`} />
       <Icon className={`h-5 w-5 shrink-0 ${toneConfig.iconColor}`} />
       <span className="flex-1 text-sm font-medium text-ink-800 dark:text-ink-100">{toast.message}</span>

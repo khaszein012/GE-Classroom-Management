@@ -196,6 +196,17 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
 
   const animatedBalance = useCountUp(row?.balance ?? 0, 900);
 
+  // Gold shine-sweep across the balance whenever it increases — the reward
+  // moment for earning. Skipped on first load and on decreases (spending).
+  const [shineKey, setShineKey] = useState(0);
+  const prevBalanceRef = useRef<number | null>(null);
+  const balance = row?.balance ?? 0;
+  useEffect(() => {
+    const prev = prevBalanceRef.current;
+    prevBalanceRef.current = balance;
+    if (prev !== null && balance > prev) setShineKey((k) => k + 1);
+  }, [balance]);
+
   const goal: Goal = {
     target: row?.goal_target ?? null,
     label: row?.goal_label ?? null,
@@ -409,8 +420,11 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
               </p>
               <div className="mt-2 flex items-baseline gap-3">
                 <CurrencyIcon name={currency.icon} className={`h-9 w-9 md:h-11 md:w-11 ${iconClass}`} strokeWidth={2.25} />
-                <span className="text-5xl font-extrabold tabular-nums tracking-tight text-ink-900 dark:text-warm-ivory sm:text-6xl md:text-7xl">
-                  {animatedBalance}
+                <span
+                  key={shineKey}
+                  className={`${shineKey > 0 ? "shine-sweep " : ""}text-5xl font-extrabold tracking-tight text-ink-900 dark:text-warm-ivory sm:text-6xl md:text-7xl`}
+                >
+                  <span className="tabular-nums">{animatedBalance}</span>
                 </span>
               </div>
               <p className="mt-1 text-sm font-medium text-ink-400 dark:text-ink-500">

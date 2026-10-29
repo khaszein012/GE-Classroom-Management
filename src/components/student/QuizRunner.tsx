@@ -15,6 +15,7 @@ import type { QuizAttempt } from "@/types";
 import { seededShuffle } from "@/lib/quizShuffle";
 import { Skeleton } from "@/components/Skeleton";
 import { QuizReview } from "@/components/student/QuizReview";
+import { ScoreReveal } from "@/components/student/ScoreReveal";
 
 interface ShuffledQuestion extends MyQuizQuestion {
   shuffledOptions: MyQuizQuestion["options"];
@@ -39,7 +40,7 @@ export function QuizRunner({
   onClose: () => void;
   onSubmitted: () => void;
 }) {
-  const [phase, setPhase] = useState<"loading" | "taking" | "confirm" | "review">("loading");
+  const [phase, setPhase] = useState<"loading" | "taking" | "confirm" | "reveal" | "review">("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [questions, setQuestions] = useState<ShuffledQuestion[]>([]);
@@ -49,6 +50,7 @@ export function QuizRunner({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [review, setReview] = useState<MyAttemptReview | null>(null);
+  const [reveal, setReveal] = useState<{ title: string; correctCount: number; totalCount: number; gemsAwarded: number } | null>(null);
   /** Question ids whose latest answer has not been confirmed saved. */
   const dirtyRef = useRef<Set<string>>(new Set());
   const answersRef = useRef<Record<string, string>>({});
@@ -147,17 +149,23 @@ export function QuizRunner({
         );
         return;
       }
-      await submitMyQuizAttempt(attempt!.id);
+      const result = await submitMyQuizAttempt(attempt!.id);
       const r = await getMyAttemptReview(attempt!.id);
       setReview(r);
-      setPhase("review");
+      setReveal({
+        title: quiz.title,
+        correctCount: result.correctCount,
+        totalCount: result.totalCount,
+        gemsAwarded: result.gemsAwarded,
+      });
+      setPhase("reveal");
       onSubmitted();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Couldn't submit. Try again.");
     } finally {
       setSubmitting(false);
     }
-  }, [attempt, flushDirty, onSubmitted, submitting]);
+  }, [attempt, flushDirty, onSubmitted, submitting, quiz.title]);
 
   if (phase === "loading") {
     return (
@@ -187,6 +195,21 @@ export function QuizRunner({
             Back to quizzes
           </button>
         </div>
+      </Overlay>
+    );
+  }
+
+  if (phase === "reveal" && reveal) {
+    return (
+      <Overlay>
+        <ScoreReveal
+          title={reveal.title}
+          correctCount={reveal.correctCount}
+          totalCount={reveal.totalCount}
+          gemsAwarded={reveal.gemsAwarded}
+          gems={gems}
+          onDone={() => setPhase("review")}
+        />
       </Overlay>
     );
   }

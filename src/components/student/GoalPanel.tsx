@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Pencil, Target, X } from "lucide-react";
+import { Award, Check, Pencil, Target, X } from "lucide-react";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import type { CurrencySettings, RewardCurrency } from "@/types";
 
@@ -237,41 +237,67 @@ export function GoalPanel({
               <Pencil className="h-3.5 w-3.5" />
             </button>
           </div>
-          <p className="mt-1 flex items-center gap-1 font-mono text-2xl font-bold tabular-nums text-ink-900 dark:text-warm-ivory">
-            <CurrencyIcon
-              name={settings.icon}
-              className="h-5 w-5 text-deep-gold dark:text-antique-gold"
-              aria-hidden
-            />
-            {balance}
-            <span className="font-sans text-sm font-medium text-ink-400 dark:text-ink-500">of {goal.target}</span>
-            <span className="ml-1 font-sans text-sm font-medium text-ink-400 dark:text-ink-500">
-              {settings.plural.toLowerCase()}
-            </span>
-          </p>
-          <div
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={goal.target}
-            aria-valuenow={Math.min(balance, goal.target)}
-          >
-            <div
-              className="h-full rounded-full bg-antique-gold transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
+          <div className="mt-3 flex items-center gap-4">
+            {/* Circular progress ring — the goal as a meter, not a line */}
+            <div className="relative h-20 w-20 shrink-0">
+              <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90" aria-hidden>
+                <circle
+                  cx="40"
+                  cy="40"
+                  r="34"
+                  fill="none"
+                  strokeWidth="8"
+                  className="stroke-ink-100 dark:stroke-ink-800"
+                />
+                <circle
+                  cx="40"
+                  cy="40"
+                  r="34"
+                  fill="none"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  className="stroke-antique-gold transition-[stroke-dashoffset] duration-700 ease-out"
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  strokeDashoffset={RING_CIRCUMFERENCE * (1 - progress / 100)}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-mono text-sm font-bold tabular-nums text-ink-900 dark:text-warm-ivory">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1 font-mono text-xl font-bold tabular-nums text-ink-900 dark:text-warm-ivory">
+                <CurrencyIcon
+                  name={settings.icon}
+                  className="h-4 w-4 text-deep-gold dark:text-antique-gold"
+                  aria-hidden
+                />
+                {balance}
+                <span className="font-sans text-sm font-medium text-ink-400 dark:text-ink-500">
+                  of {goal.target} {settings.plural.toLowerCase()}
+                </span>
+              </p>
+              {!reached ? (
+                <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
+                  {remaining} {remaining === 1 ? settings.singular.toLowerCase() : settings.plural.toLowerCase()} to go
+                </p>
+              ) : (
+                <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-deep-gold dark:text-antique-gold">
+                  <Award className="h-4 w-4 animate-medal-pop" aria-hidden />
+                  Goal reached!
+                </p>
+              )}
+            </div>
           </div>
-          {!reached && (
-            <p className="mt-1.5 text-xs text-ink-400 dark:text-ink-500">
-              {remaining} {remaining === 1 ? settings.singular.toLowerCase() : settings.plural.toLowerCase()} to go
-            </p>
-          )}
         </div>
       )}
 
       {reached && !bannerDismissed && !editing && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-card border border-deep-gold/30 bg-ivory-dim px-3.5 py-2.5 dark:border-antique-gold/30 dark:bg-antique-gold/10">
-          <p className="text-xs font-medium text-deep-gold dark:text-antique-gold">
+          <p className="flex items-center gap-2 text-xs font-semibold text-deep-gold dark:text-antique-gold">
+            <Award className="h-4 w-4 shrink-0 animate-medal-pop" aria-hidden />
             Goal reached — {goal.label || "nice work"}.
           </p>
           <button
@@ -286,3 +312,5 @@ export function GoalPanel({
     </div>
   );
 }
+
+const RING_CIRCUMFERENCE = 2 * Math.PI * 34;

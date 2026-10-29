@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import type { buildTrend } from "@/components/student/activity";
@@ -21,6 +21,13 @@ export function TrendChart({
     const max = Math.max(...trend.daily.map((d) => d.total), 1);
     return trend.daily.map((d) => ({ ...d, height: (d.total / max) * 100 }));
   }, [trend.daily]);
+
+  // Bars draw in with a stagger once mounted.
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDrawn(true), 80);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div>
@@ -58,10 +65,13 @@ export function TrendChart({
         {bars.map((b, i) => (
           <div key={i} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
             <div
-              className={`w-full rounded-sm transition-all ${
+              className={`w-full rounded-sm transition-[height] duration-500 ease-out ${
                 b.total > 0 ? "bg-antique-gold dark:bg-antique-gold" : "bg-ink-200 dark:bg-ink-800"
               }`}
-              style={{ height: `${Math.max(b.total > 0 ? b.height : 4, 4)}%` }}
+              style={{
+                height: `${drawn ? Math.max(b.total > 0 ? b.height : 4, 4) : 2}%`,
+                transitionDelay: `${i * 30}ms`,
+              }}
               title={`${b.total > 0 ? `${b.total} earned` : "No points"} — ${b.label}`}
             />
             {/* Sparse axis: "Now" plus every other date, so labels never

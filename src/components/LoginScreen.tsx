@@ -104,6 +104,7 @@ export function LoginScreen() {
         <div className="mb-8 flex flex-col items-center text-center">
           <BrandLockup />
           <h1 className="brand-text mt-4 font-display text-3xl font-semibold">GENJI EDUCATOR</h1>
+          <div className="gold-rule mx-auto mt-3 h-px w-28 animate-rule-in" aria-hidden />
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             {tab === "teacher" ? "Teacher sign in" : "Student sign in"}
           </p>

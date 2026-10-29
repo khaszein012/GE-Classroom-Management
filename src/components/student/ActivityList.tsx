@@ -63,8 +63,8 @@ export function ActivityList({ groups, hasMore, loadingMore, onLoadMore }: {
                 {g.dayLabel}
               </p>
               <ul className="divide-y divide-ink-100 overflow-hidden rounded-card border border-ink-200/70 bg-warm-ivory dark:divide-ink-800 dark:border-ink-800/70 dark:bg-ink-900">
-                {g.entries.map((e) => (
-                  <ActivityRow key={e.id} entry={e} />
+                {g.entries.map((e, i) => (
+                  <ActivityRow key={e.id} entry={e} index={i} />
                 ))}
               </ul>
             </div>
@@ -85,13 +85,18 @@ export function ActivityList({ groups, hasMore, loadingMore, onLoadMore }: {
   );
 }
 
-function ActivityRow({ entry }: { entry: ActivityGroup["entries"][number] }) {
+function ActivityRow({ entry, index }: { entry: ActivityGroup["entries"][number]; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const positive = entry.total >= 0;
 
   return (
     <li
-      style={{ animation: "rowSlideIn 0.3s ease" }}
+      style={{
+        animation: "rowSlideIn 0.3s ease",
+        // Cascade the first rows in; later rows appear without delay.
+        animationDelay: index < 10 ? `${index * 40}ms` : undefined,
+        animationFillMode: "backwards",
+      }}
       className="px-4 py-3"
       data-newest={entry.newestId}
     >

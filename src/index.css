@@ -112,6 +112,18 @@
   }
   html, body, #root { height: 100%; }
   body { @apply bg-ivory-dim text-obsidian dark:bg-obsidian dark:text-warm-ivory; }
+  /* Paper-grain texture on light surfaces; deep gold aura + grain on dark.
+     Pure CSS (tiled SVG noise) so it follows every theme via the tokens. */
+  body {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+  html.dark body {
+    background-image:
+      radial-gradient(1100px 520px at 50% -8%, rgb(var(--c-antique-gold) / 0.07), transparent 62%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  /* Every button presses in, app-wide. */
+  button:not(:disabled):active { transform: scale(0.98); }
   ::selection { background: rgb(var(--c-antique-gold) / 0.35); }
   :focus-visible { @apply outline-none ring-2 ring-antique-gold ring-offset-2 ring-offset-warm-ivory dark:ring-antique-gold dark:ring-offset-obsidian; }
   input, select, textarea, button { font: inherit; }
@@ -130,6 +142,23 @@
   .brand-accent { color: rgb(var(--brand-gold)); }
   .brand-tile { background: rgb(var(--brand-ink)); color: rgb(var(--brand-ivory)); }
   .dark .brand-tile { background: rgb(var(--brand-ivory)); color: rgb(var(--brand-ink)); }
+  /* Gilded Classroom utilities */
+  .gold-rule {
+    background: linear-gradient(90deg, transparent, rgb(var(--brand-gold)), transparent);
+  }
+  /* Gold shine-sweep across a figure (wrapped in overflow-hidden). The
+     animation runs when the element remounts (keyed by an increase). */
+  .shine-sweep { position: relative; display: inline-block; overflow: hidden; }
+  .shine-sweep::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 30%, rgb(var(--c-antique-gold) / 0.4) 50%, transparent 70%);
+    animation: shine 1.1s ease 0.15s 1 both;
+  }
+  .hover-lift { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+  .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(64, 50, 20, 0.14); }
+  .dark .hover-lift:hover { box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); }
 }
 
 @keyframes cardPulse {
@@ -146,7 +175,8 @@
 .dark *::-webkit-scrollbar-thumb { background: rgb(var(--c-ink-600)); }
 
 /* Printed output (e.g. login cards) stays high-contrast in greyscale
-   regardless of theme: pin every token to the Genji values in print. */
+   regardless of theme: pin every token to the Genji values in print, and
+   keep backgrounds plain so the grain never prints. */
 @media print {
   html, html[data-theme="indigo"], html[data-theme="sage"], html[data-theme="plum"] {
     --c-obsidian: 11 13 16;
@@ -168,4 +198,5 @@
     --c-ink-900: 15 18 22;
     --c-ink-950: 11 13 16;
   }
+  body { background-image: none !important; }
 }
