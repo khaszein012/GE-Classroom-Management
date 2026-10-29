@@ -32,12 +32,12 @@ jobs:
       - name: Production build
         run: npm run build
 
-  # Optional but recommended: add TEACHER_EMAIL / TEACHER_PASSWORD as repo
-  # secrets and this runs the full 60-assertion security suite in CI too.
+  # Runs the full 60-assertion security suite once teacher credentials are
+  # present as repo secrets; the step skips (job stays green) until then.
+  # NOTE: the secrets context is only readable in STEP-level conditions.
   security:
     runs-on: ubuntu-latest
     needs: test
-    if: ${{ github.secrets.TEACHER_EMAIL != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,6 +46,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Security regression suite
+        if: ${{ secrets.TEACHER_EMAIL != '' && secrets.TEACHER_PASSWORD != '' }}
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
