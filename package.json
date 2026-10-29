@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "node --env-file=.env scripts/security-test.mjs",
+    "test:csv": "esbuild scripts/csv-test.mjs --bundle --format=esm --outfile=node_modules/.cache/csv-test.mjs --log-level=error && node node_modules/.cache/csv-test.mjs",
+    "backup": "node --env-file=.env scripts/backup.mjs",
     "sec-test": "node --env-file=.env scripts/security-test.mjs"
   },
   "dependencies": {

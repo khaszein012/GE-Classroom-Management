@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-push guard: nothing broken or untested reaches GitHub (and production).
+set -e
+cd "$(git rev-parse --show-toplevel)"
+echo "▶ typecheck"
+npm run --silent typecheck
+echo "▶ lint"
+npm run --silent lint
+echo "▶ csv tests"
+npm run --silent test:csv
+echo "▶ build"
+npm run --silent build >/dev/null
+echo "✓ pre-push checks passed"
