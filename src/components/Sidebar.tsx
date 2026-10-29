@@ -112,6 +112,7 @@ function NavItems({ current, onNavigate, pendingCount = 0 }: NavItemsProps) {
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}
+            aria-current={active ? "page" : undefined}
             className={`group relative flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-medium transition-colors ${
               active
                 ? "border-l-[3px] border-antique-gold bg-ivory-dim text-deep-gold dark:border-antique-gold dark:bg-antique-gold/10 dark:text-antique-gold"

@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Sidebar, type Screen } from "@/components/Sidebar";
 import { Dashboard } from "@/components/Dashboard";
 import { StudentsScreen } from "@/components/StudentsScreen";
 import { BehaviorsScreen } from "@/components/BehaviorsScreen";
 import { ActivityLogScreen } from "@/components/ActivityLogScreen";
 import { RewardsScreen } from "@/components/RewardsScreen";
-import { QuizzesScreen } from "@/components/QuizzesScreen";
+// Quizzes screens are code-split: the builder, editor and results are the
+// heaviest views and are rarely a session's first destination.
+const QuizzesScreen = lazy(() =>
+  import("@/components/QuizzesScreen").then((m) => ({ default: m.QuizzesScreen })),
+);
 import { SettingsScreen } from "@/components/SettingsScreen";
 import { LoginScreen } from "@/components/LoginScreen";
 import { StudentView } from "@/components/StudentView";
@@ -44,6 +48,14 @@ const SCREEN_TITLES: Record<Screen, string> = {
   activity: "Activity Log",
   settings: "Settings",
 };
+
+function ScreenFallback() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <Skeleton className="h-24 w-full max-w-[1400px] rounded-card" />
+    </div>
+  );
+}
 
 function MainApp({
   store,
@@ -125,7 +137,11 @@ function MainApp({
             )}
             {screen === "behaviors" && <BehaviorsScreen store={store} />}
             {screen === "rewards" && <RewardsScreen store={store} />}
-            {screen === "quizzes" && <QuizzesScreen store={store} />}
+            {screen === "quizzes" && (
+              <Suspense fallback={<ScreenFallback />}>
+                <QuizzesScreen store={store} />
+              </Suspense>
+            )}
             {screen === "activity" && <ActivityLogScreen store={store} />}
             {screen === "settings" && (
               <SettingsScreen

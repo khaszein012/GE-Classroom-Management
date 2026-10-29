@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 interface Props {
   open: boolean;
@@ -20,6 +21,8 @@ export function ConfirmDialog({ open, title, message, confirmLabel = "Delete", o
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onCancel]);
 
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+
   if (!open) return null;
 
   return (
@@ -28,7 +31,12 @@ export function ConfirmDialog({ open, title, message, confirmLabel = "Delete", o
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm animate-fade-scale-in rounded-card bg-warm-ivory p-6 shadow-soft-lg dark:bg-ink-900"
+        ref={trapRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className="w-full max-w-sm animate-fade-scale-in rounded-card bg-warm-ivory p-6 shadow-soft-lg outline-none dark:bg-ink-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-card bg-warm-brick/10 dark:bg-warm-brick/15">

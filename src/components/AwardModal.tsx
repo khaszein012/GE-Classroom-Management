@@ -5,6 +5,7 @@ import { Monogram } from "@/components/Monogram";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { CurrencyAmount } from "@/components/CurrencyAmount";
 import { loadSortMode, sortStudents } from "@/lib/sortStudents";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 interface Props {
   open: boolean;
@@ -22,6 +23,7 @@ export function AwardModal({ open, store, selectedCount, onClose, onAwarded }: P
   const [customReason, setCustomReason] = useState("");
   const [customPoints, setCustomPoints] = useState<string>("1");
   const [customError, setCustomError] = useState("");
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {
     if (open) {
@@ -82,7 +84,12 @@ export function AwardModal({ open, store, selectedCount, onClose, onAwarded }: P
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92vh] w-full animate-fade-scale-in flex-col rounded-t-card bg-warm-ivory shadow-soft-lg dark:bg-ink-900 sm:max-w-2xl sm:rounded-card"
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Award ${currency.plural}`}
+        tabIndex={-1}
+        className="flex max-h-[92vh] w-full animate-fade-scale-in flex-col rounded-t-card bg-warm-ivory shadow-soft-lg outline-none dark:bg-ink-900 sm:max-w-2xl sm:rounded-card"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4 dark:border-ink-800">

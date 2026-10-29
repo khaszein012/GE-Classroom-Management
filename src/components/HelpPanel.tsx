@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { useCurrency } from "@/components/CurrencyProvider";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 /**
  * Teacher help: a slide-over guide written against the live configuration
@@ -21,11 +22,14 @@ export function HelpPanel({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
+
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div className="absolute inset-0 bg-ink-950/40 backdrop-blur-sm" />
       <aside
-        className="absolute right-0 top-0 h-full w-full max-w-md animate-slide-in-right overflow-y-auto bg-warm-ivory shadow-soft-lg dark:bg-ink-900"
+        ref={trapRef}
+        className="absolute right-0 top-0 h-full w-full max-w-md animate-slide-in-right overflow-y-auto bg-warm-ivory shadow-soft-lg outline-none dark:bg-ink-900"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

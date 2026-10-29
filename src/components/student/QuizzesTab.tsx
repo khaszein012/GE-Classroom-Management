@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,8 +14,15 @@ import type { MyAttemptReview, MyQuizItem } from "@/lib/storage";
 import { getMyAttemptReview } from "@/lib/storage";
 import { relativeUntil } from "@/lib/time";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
-import { QuizRunner } from "@/components/student/QuizRunner";
 import { QuizReview } from "@/components/student/QuizReview";
+import { useFocusTrap } from "@/lib/useFocusTrap";
+import { Skeleton } from "@/components/Skeleton";
+
+// The quiz-taking flow is code-split — it loads the moment a student
+// starts, not on every dashboard visit.
+const QuizRunner = lazy(() =>
+  import("@/components/student/QuizRunner").then((m) => ({ default: m.QuizRunner })),
+);
 
 /**
  * The student's Quizzes tab. The quiz list lives in the parent (StudentView)
@@ -47,6 +54,7 @@ export function QuizzesTab({
   const [startCandidate, setStartCandidate] = useState<MyQuizItem | null>(null);
   const [activeQuiz, setActiveQuiz] = useState<MyQuizItem | null>(null);
   const [reviewing, setReviewing] = useState<MyAttemptReview | null>(null);
+  const reviewTrapRef = useFocusTrap<HTMLDivElement>(reviewing !== null);
 
   // The dashboard's Start button hops to this tab and asks us to open the
   // quiz: continue silently if already started, warn first otherwise.
@@ -75,21 +83,30 @@ export function QuizzesTab({
 
   if (activeQuiz) {
     return (
-      <QuizRunner
-        quiz={activeQuiz}
-        gems={gems}
-        onClose={() => {
-          setActiveQuiz(null);
-          onGemsChanged();
-        }}
-        onSubmitted={onGemsChanged}
-      />
+      <Suspense fallback={<RunnerFallback />}>
+        <QuizRunner
+          quiz={activeQuiz}
+          gems={gems}
+          onClose={() => {
+            setActiveQuiz(null);
+            onGemsChanged();
+          }}
+          onSubmitted={onGemsChanged}
+        />
+      </Suspense>
     );
   }
 
   if (reviewing) {
     return (
-      <div className="fixed inset-0 z-50 bg-ink-50 dark:bg-ink-950">
+      <div
+        ref={reviewTrapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Quiz review: ${reviewing.title}`}
+        tabIndex={-1}
+        className="fixed inset-0 z-50 bg-ink-50 outline-none dark:bg-ink-950"
+      >
         <QuizReview
           review={reviewing}
           gems={gems}
@@ -340,5 +357,21 @@ function ActionButton({
       {label}
       {primary && <ChevronRight className="h-4 w-4" aria-hidden />}
     </button>
+  );
+}
+
+function RunnerFallback() {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-ink-50 dark:bg-ink-950">
+      <div className="mx-auto w-full max-w-[640px] px-5 pt-8">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-6 h-6 w-full" />
+        <div className="mt-5 space-y-2.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 rounded-button" />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

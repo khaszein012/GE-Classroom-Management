@@ -175,12 +175,71 @@ export function QuizResults({ store, quizId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Student roster */}
+        {/* Student roster — cards on phones, table from md up */}
         <section className="mt-6">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
             Students
           </h2>
-          <div className="mt-3 overflow-hidden rounded-card border border-ink-200/70 shadow-soft dark:border-ink-800/70">
+          <div className="mt-3 space-y-2 md:hidden">
+            {assignedStudents.map((s, i) => {
+              const attempt = attemptByStudent.get(s.id);
+              const isSubmitted = !!attempt?.submittedAt;
+              const missed = !isSubmitted && pastDue;
+              return (
+                <div
+                  key={s.id}
+                  className="rounded-card border border-ink-200/70 bg-warm-ivory p-3.5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Monogram name={s.displayName} colorIndex={i} size="xs" />
+                      <span className="truncate text-sm font-semibold text-ink-900 dark:text-warm-ivory">
+                        {s.displayName}
+                      </span>
+                    </div>
+                    {isSubmitted ? (
+                      <StatusPill icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Submitted" tone="good" />
+                    ) : missed ? (
+                      <StatusPill icon={<XCircle className="h-3.5 w-3.5" />} label="Missed" tone="bad" />
+                    ) : attempt ? (
+                      <StatusPill icon={<Clock className="h-3.5 w-3.5" />} label="In progress" tone="neutral" />
+                    ) : (
+                      <StatusPill icon={<MinusCircle className="h-3.5 w-3.5" />} label="Not started" tone="neutral" />
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-ink-100 pt-2 dark:border-ink-800">
+                    <span className="text-xs font-medium text-ink-400 dark:text-ink-500">Score</span>
+                    {isSubmitted && attempt?.totalCount ? (
+                      <span className="font-mono font-semibold tabular-nums text-ink-800 dark:text-ink-100">
+                        {attempt.correctCount}/{attempt.totalCount}
+                        <span className="ml-1.5 text-ink-400 dark:text-ink-500">
+                          {Math.round(((attempt.correctCount ?? 0) / attempt.totalCount) * 100)}%
+                        </span>
+                      </span>
+                    ) : missed ? (
+                      <span className="font-mono tabular-nums text-ink-400 dark:text-ink-500">
+                        0/{detail.questions.length}
+                      </span>
+                    ) : (
+                      <span className="text-ink-400 dark:text-ink-500">—</span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-ink-400 dark:text-ink-500">{gems.plural}</span>
+                    <span className="font-mono text-sm font-semibold tabular-nums text-deep-gold dark:text-antique-gold">
+                      {isSubmitted || missed ? attempt?.gemsAwarded ?? 0 : "—"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {assignedStudents.length === 0 && (
+              <div className="rounded-card border border-ink-200/70 px-4 py-8 text-center text-sm text-ink-400 dark:border-ink-800/70 dark:text-ink-500">
+                No students are assigned to this quiz.
+              </div>
+            )}
+          </div>
+          <div className="mt-3 hidden overflow-hidden rounded-card border border-ink-200/70 shadow-soft md:block dark:border-ink-800/70">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-ink-200/70 bg-ivory-dim/60 text-left text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:border-ink-800/70 dark:bg-ink-800/40 dark:text-ink-500">

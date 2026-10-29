@@ -16,6 +16,7 @@ import { seededShuffle } from "@/lib/quizShuffle";
 import { Skeleton } from "@/components/Skeleton";
 import { QuizReview } from "@/components/student/QuizReview";
 import { ScoreReveal } from "@/components/student/ScoreReveal";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 interface ShuffledQuestion extends MyQuizQuestion {
   shuffledOptions: MyQuizQuestion["options"];
@@ -169,7 +170,7 @@ export function QuizRunner({
 
   if (phase === "loading") {
     return (
-      <Overlay>
+      <Overlay label="Loading quiz">
         <div className="mx-auto w-full max-w-[640px] px-5 py-8">
           <Skeleton className="h-5 w-40" />
           <Skeleton className="mt-6 h-6 w-full" />
@@ -185,7 +186,7 @@ export function QuizRunner({
 
   if (loadError || !attempt) {
     return (
-      <Overlay>
+      <Overlay label="Quiz error">
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="max-w-sm text-sm font-medium text-warm-brick">{loadError ?? "Couldn't open this quiz."}</p>
           <button
@@ -201,7 +202,7 @@ export function QuizRunner({
 
   if (phase === "reveal" && reveal) {
     return (
-      <Overlay>
+      <Overlay label="Quiz result">
         <ScoreReveal
           title={reveal.title}
           correctCount={reveal.correctCount}
@@ -216,7 +217,7 @@ export function QuizRunner({
 
   if (phase === "review" && review) {
     return (
-      <Overlay>
+      <Overlay label={`Quiz review: ${review.title}`}>
         <QuizReview review={review} gems={gems} onCloseLabel="Back to quizzes" onClose={onClose} />
       </Overlay>
     );
@@ -229,7 +230,7 @@ export function QuizRunner({
   const progressPct = total > 0 ? ((index + 1) / total) * 100 : 100;
 
   return (
-    <Overlay>
+    <Overlay label={`Taking quiz: ${quiz.title}`}>
       {/* Header */}
       <header className="shrink-0 border-b border-ink-200/60 bg-warm-ivory px-4 py-3 dark:border-ink-800/60 dark:bg-ink-900 sm:px-6">
         <div className="mx-auto flex w-full max-w-[640px] items-center justify-between gap-3">
@@ -422,8 +423,20 @@ export function QuizRunner({
   }
 }
 
-function Overlay({ children }: { children: React.ReactNode }) {
+/** Full-screen quiz surface: traps focus so keyboard/SR users stay inside
+ *  while it is open, and restores focus to where they came from on exit. */
+function Overlay({ children, label }: { children: React.ReactNode; label: string }) {
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink-50 dark:bg-ink-950">{children}</div>
+    <div
+      ref={trapRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 flex flex-col bg-ink-50 outline-none dark:bg-ink-950"
+    >
+      {children}
+    </div>
   );
 }

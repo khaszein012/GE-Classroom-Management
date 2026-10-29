@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { AVATAR_PALETTE, initialsOf } from "@/lib/avatarColor";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 interface Props {
   open: boolean;
@@ -32,6 +33,8 @@ export function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+
   if (!open) return null;
 
   return (
@@ -40,7 +43,11 @@ export function Modal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md animate-fade-scale-in rounded-t-card bg-warm-ivory shadow-soft-lg dark:bg-ink-900 sm:rounded-card"
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        className="w-full max-w-md animate-fade-scale-in rounded-t-card bg-warm-ivory shadow-soft-lg outline-none dark:bg-ink-900 sm:rounded-card"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4 dark:border-ink-800">
