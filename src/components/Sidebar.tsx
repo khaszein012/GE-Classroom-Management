@@ -1,4 +1,4 @@
-import { ClipboardList, History, Home, LogOut, Menu, Moon, Settings, Store, Sun, Users, X, Zap } from "lucide-react";
+import { ClipboardList, HelpCircle, History, Home, LogOut, Menu, Moon, Settings, Store, Sun, Users, X, Zap } from "lucide-react";
 import { BrandMark } from "@/components/Brand";
 import { useState } from "react";
 
@@ -12,6 +12,7 @@ interface Props {
   email?: string | null;
   onSignOut?: () => void;
   pendingCount?: number;
+  onOpenHelp?: () => void;
 }
 
 interface NavItemsProps {
@@ -30,12 +31,17 @@ const NAV: { id: Screen; label: string; icon: typeof Home }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSignOut, pendingCount = 0 }: Props) {
+export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSignOut, pendingCount = 0, onOpenHelp }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleNav = (s: Screen) => {
     onNavigate(s);
     setMobileOpen(false);
+  };
+
+  const openHelp = () => {
+    setMobileOpen(false);
+    onOpenHelp?.();
   };
 
   return (
@@ -71,7 +77,7 @@ export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSi
               </button>
             </div>
             <NavItems current={current} onNavigate={handleNav} pendingCount={pendingCount} />
-            <Footer theme={theme} onToggleTheme={onToggleTheme} email={email} onSignOut={onSignOut} />
+            <Footer theme={theme} onToggleTheme={onToggleTheme} email={email} onSignOut={onSignOut} onOpenHelp={openHelp} />
           </div>
         </div>
       )}
@@ -85,7 +91,7 @@ export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSi
           <NavItems current={current} onNavigate={handleNav} pendingCount={pendingCount} />
         </div>
         <div className="px-3 pb-4">
-          <Footer theme={theme} onToggleTheme={onToggleTheme} email={email} onSignOut={onSignOut} />
+          <Footer theme={theme} onToggleTheme={onToggleTheme} email={email} onSignOut={onSignOut} onOpenHelp={openHelp} />
         </div>
       </aside>
     </>
@@ -146,14 +152,25 @@ function Footer({
   onToggleTheme,
   email,
   onSignOut,
+  onOpenHelp,
 }: {
   theme: "light" | "dark";
   onToggleTheme: () => void;
   email?: string | null;
   onSignOut?: () => void;
+  onOpenHelp?: () => void;
 }) {
   return (
     <div className="mt-4 border-t border-ink-200/70 pt-3 dark:border-ink-800/70">
+      {onOpenHelp && (
+        <button
+          onClick={onOpenHelp}
+          className="flex w-full items-center gap-3 rounded-button px-3 py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100"
+        >
+          <HelpCircle className="h-[18px] w-[18px]" />
+          Help & guide
+        </button>
+      )}
       <button
         onClick={onToggleTheme}
         className="flex w-full items-center gap-3 rounded-button px-3 py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100"

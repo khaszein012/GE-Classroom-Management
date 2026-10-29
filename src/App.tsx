@@ -17,6 +17,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useStore, type Store } from "@/lib/useStore";
 import { useTheme } from "@/lib/useTheme";
 import { applyColorTheme } from "@/lib/themes";
+import { HelpPanel } from "@/components/HelpPanel";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { ONBOARDING_FLAG } from "@/lib/prefs";
 import { migrateLegacyData } from "@/lib/migrate";
 import { Skeleton } from "@/components/Skeleton";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
@@ -56,6 +59,8 @@ function MainApp({
   const { config, updateCurrency } = useCurrency();
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [printing, setPrinting] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const pendingCount = store.redemptions.filter((r) => r.status === "pending").length;
 
   // The teacher's saved theme becomes authoritative once loaded; until then
@@ -63,6 +68,19 @@ function MainApp({
   useEffect(() => {
     if (!store.loading) applyColorTheme(store.colorTheme);
   }, [store.colorTheme, store.loading]);
+
+  // First-run wizard: a brand-new teacher (zero students) who hasn't
+  // dismissed it before gets the guided setup exactly once.
+  useEffect(() => {
+    if (!store.loading && store.students.length === 0 && localStorage.getItem(ONBOARDING_FLAG) !== "1") {
+      setWizardOpen(true);
+    }
+  }, [store.loading, store.students.length]);
+
+  const closeWizard = () => {
+    localStorage.setItem(ONBOARDING_FLAG, "1");
+    setWizardOpen(false);
+  };
 
   useEffect(() => {
     document.title = `${SCREEN_TITLES[screen]} · Genji Educator`;
@@ -83,6 +101,7 @@ function MainApp({
         email={email}
         onSignOut={() => void signOut()}
         pendingCount={pendingCount}
+        onOpenHelp={() => setHelpOpen(true)}
       />
       {/* On desktop the sidebar is fixed 256px wide — shift content right by exactly that amount */}
       <main className="min-w-0 flex-1 overflow-hidden lg:ml-64">
@@ -126,6 +145,18 @@ function MainApp({
           </div>
         )}
       </main>
+
+      {helpOpen && <HelpPanel onClose={() => setHelpOpen(false)} />}
+      {wizardOpen && (
+        <OnboardingWizard
+          store={store}
+          onDone={closeWizard}
+          onGoTo={(s) => {
+            closeWizard();
+            setScreen(s);
+          }}
+        />
+      )}
     </div>
   );
 }
