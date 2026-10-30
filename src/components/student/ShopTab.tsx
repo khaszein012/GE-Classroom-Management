@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock, Gem, Store, X } from "lucide-react";
+import { Clock, Gem, LayoutGrid, List, Store, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as storage from "@/lib/storage";
 import type { Reward, RewardCurrency, CurrencySettings } from "@/types";
@@ -20,6 +20,17 @@ export interface MyRedemption {
 }
 
 type ShopFilter = "all" | "dollars" | "gems";
+type ShopView = "grid" | "list";
+
+const SHOP_VIEW_KEY = "cr_shop_view";
+
+function loadShopView(): ShopView {
+  try {
+    return localStorage.getItem(SHOP_VIEW_KEY) === "list" ? "list" : "grid";
+  } catch {
+    return "grid";
+  }
+}
 
 /**
  * The student's Shop tab. Two sealed economies side by side: rewards priced
@@ -44,6 +55,7 @@ export function ShopTab({
   const [redemptions, setRedemptions] = useState<MyRedemption[] | null>(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<ShopFilter>("all");
+  const [view, setView] = useState<ShopView>(loadShopView);
   const [confirming, setConfirming] = useState<Reward | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -170,6 +182,15 @@ export function ShopTab({
   const settingsFor = (c: RewardCurrency) => (c === "gems" ? gemsCurrency : currency);
   const balanceFor = (c: RewardCurrency) => (c === "gems" ? gemsBalance : balance);
 
+  const setViewPersisted = (v: ShopView) => {
+    setView(v);
+    try {
+      localStorage.setItem(SHOP_VIEW_KEY, v);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const list = rewards;
   const history = redemptions ?? [];
   const dollarRewards = list.filter((r) => r.currency !== "gems");
@@ -245,6 +266,38 @@ export function ShopTab({
           <span className="ml-auto text-xs font-medium text-ink-400 dark:text-ink-500">
             {visible.length} {visible.length === 1 ? "reward" : "rewards"}
           </span>
+          <div
+            className="flex rounded-button border border-ink-200 bg-warm-ivory p-0.5 dark:border-ink-700 dark:bg-ink-900"
+            role="group"
+            aria-label="Shop view"
+          >
+            <button
+              onClick={() => setViewPersisted("grid")}
+              aria-pressed={view === "grid"}
+              aria-label="Grid view"
+              title="Grid view"
+              className={`flex h-11 w-11 items-center justify-center rounded-button transition-colors ${
+                view === "grid"
+                  ? "bg-obsidian text-warm-ivory dark:bg-antique-gold dark:text-obsidian"
+                  : "text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden />
+            </button>
+            <button
+              onClick={() => setViewPersisted("list")}
+              aria-pressed={view === "list"}
+              aria-label="List view"
+              title="List view"
+              className={`flex h-11 w-11 items-center justify-center rounded-button transition-colors ${
+                view === "list"
+                  ? "bg-obsidian text-warm-ivory dark:bg-antique-gold dark:text-obsidian"
+                  : "text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
+              }`}
+            >
+              <List className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </div>
 
         {filter === "gems" && gemRewards.length === 0 ? (
@@ -266,6 +319,7 @@ export function ShopTab({
                 title={`Buy with ${currency.plural}`}
                 icon={<CurrencyIcon name={currency.icon} className="h-3.5 w-3.5" aria-hidden />}
                 rewards={dollarRewards}
+                view={view}
                 pendingByReward={pendingByReward}
                 balanceFor={balanceFor}
                 settingsFor={settingsFor}
@@ -277,6 +331,7 @@ export function ShopTab({
                 title={`Buy with ${gemsCurrency.plural}`}
                 icon={<Gem className="h-3.5 w-3.5" aria-hidden />}
                 rewards={gemRewards}
+                view={view}
                 pendingByReward={pendingByReward}
                 balanceFor={balanceFor}
                 settingsFor={settingsFor}
@@ -287,6 +342,7 @@ export function ShopTab({
         ) : (
           <RewardGrid
             rewards={visible}
+            view={view}
             pendingByReward={pendingByReward}
             balanceFor={balanceFor}
             settingsFor={settingsFor}
@@ -384,6 +440,7 @@ function RewardGroup({
   title,
   icon,
   rewards,
+  view,
   pendingByReward,
   balanceFor,
   settingsFor,
@@ -392,6 +449,7 @@ function RewardGroup({
   title: string;
   icon: React.ReactNode;
   rewards: Reward[];
+  view: ShopView;
   pendingByReward: Map<string, MyRedemption>;
   balanceFor: (c: RewardCurrency) => number;
   settingsFor: (c: RewardCurrency) => CurrencySettings;
@@ -405,6 +463,7 @@ function RewardGroup({
       </h3>
       <RewardGrid
         rewards={rewards}
+        view={view}
         pendingByReward={pendingByReward}
         balanceFor={balanceFor}
         settingsFor={settingsFor}
@@ -416,83 +475,199 @@ function RewardGroup({
 
 function RewardGrid({
   rewards,
+  view,
   pendingByReward,
   balanceFor,
   settingsFor,
   onRequest,
 }: {
   rewards: Reward[];
+  view: ShopView;
   pendingByReward: Map<string, MyRedemption>;
   balanceFor: (c: RewardCurrency) => number;
   settingsFor: (c: RewardCurrency) => CurrencySettings;
   onRequest: (r: Reward) => void;
 }) {
-  return (
-    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {rewards.map((r) => {
-        const settings = settingsFor(r.currency);
-        const balance = balanceFor(r.currency);
-        const pending = pendingByReward.get(r.id);
-        const soldOut = r.stock === 0;
-        const need = r.cost - balance;
-        const disabled = soldOut || need > 0 || !!pending;
-        const unit = (n: number) => (n === 1 ? settings.singular.toLowerCase() : settings.plural.toLowerCase());
-        let label = "Request";
-        if (pending) label = "Requested";
-        else if (soldOut) label = "Sold out";
-        else if (need > 0) label = `Need ${need} more ${unit(need)}`;
-        return (
-          <li
+  if (view === "list") {
+    return (
+      <ul className="space-y-2">
+        {rewards.map((r) => (
+          <RewardRow
             key={r.id}
-            className={`hover-lift flex flex-col rounded-card border bg-warm-ivory p-4 shadow-soft transition-colors dark:bg-ink-900 ${
-              soldOut
-                ? "border-ink-100 opacity-60 dark:border-ink-800/60"
-                : "border-ink-200/70 dark:border-ink-800/70"
-            }`}
-          >
-            <div className="-mx-4 -mt-4 mb-3">
-              <RewardThumbnail
-                imageUrl={r.imageUrl}
-                name={r.name}
-                className="aspect-[4/3] w-full"
-              />
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="min-w-0 text-sm font-semibold text-ink-900 dark:text-ink-100">
-                <span className="break-words">{r.name}</span>
-              </h3>
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-ivory-dim px-2.5 py-1 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
-                <CurrencyIcon name={settings.icon} className="h-3.5 w-3.5" aria-hidden />
-                <span className="font-mono tabular-nums">{r.cost}</span>
-                <span>{r.cost === 1 ? settings.singular : settings.plural}</span>
-              </span>
-            </div>
-            {r.description && (
-              <p className="mt-1 line-clamp-2 text-xs text-ink-500 dark:text-ink-400">{r.description}</p>
-            )}
-            <div className="mt-2 text-xs font-medium text-ink-400 dark:text-ink-500">
-              {r.stock === null ? "In stock" : soldOut ? "Sold out" : `${r.stock} left`}
-            </div>
-            <button
-              onClick={() => onRequest(r)}
-              disabled={disabled}
-              aria-label={
-                disabled
-                  ? `${r.name} — ${label}`
-                  : `Request ${r.name} for ${r.cost} ${r.cost === 1 ? settings.singular : settings.plural}`
-              }
-              className={`mt-3 flex h-11 w-full items-center justify-center rounded-button px-2 text-center text-xs font-semibold transition-colors ${
-                disabled
-                  ? "cursor-not-allowed bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500"
-                  : "bg-obsidian dark:bg-antique-gold dark:text-obsidian text-warm-ivory hover:bg-ink-700 dark:hover:bg-deep-gold"
-              }`}
-            >
-              {label}
-            </button>
-          </li>
-        );
-      })}
+            reward={r}
+            pendingByReward={pendingByReward}
+            balanceFor={balanceFor}
+            settingsFor={settingsFor}
+            onRequest={onRequest}
+          />
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {rewards.map((r) => (
+        <RewardCard
+          key={r.id}
+          reward={r}
+          pendingByReward={pendingByReward}
+          balanceFor={balanceFor}
+          settingsFor={settingsFor}
+          onRequest={onRequest}
+        />
+      ))}
     </ul>
+  );
+}
+
+function rewardButtonState(
+  r: Reward,
+  pendingByReward: Map<string, MyRedemption>,
+  balanceFor: (c: RewardCurrency) => number,
+  settings: CurrencySettings,
+) {
+  const pending = pendingByReward.get(r.id);
+  const soldOut = r.stock === 0;
+  const need = r.cost - balanceFor(r.currency);
+  const disabled = soldOut || need > 0 || !!pending;
+  const unit = (n: number) => (n === 1 ? settings.singular.toLowerCase() : settings.plural.toLowerCase());
+  let label = "Request";
+  if (pending) label = "Requested";
+  else if (soldOut) label = "Sold out";
+  else if (need > 0) label = `Need ${need} more ${unit(need)}`;
+  return { pending, soldOut, need, disabled, label };
+}
+
+/** Grid card: the visual view. Image is 16:9 so the shelf stays scannable. */
+function RewardCard({
+  reward: r,
+  pendingByReward,
+  balanceFor,
+  settingsFor,
+  onRequest,
+}: {
+  reward: Reward;
+  pendingByReward: Map<string, MyRedemption>;
+  balanceFor: (c: RewardCurrency) => number;
+  settingsFor: (c: RewardCurrency) => CurrencySettings;
+  onRequest: (r: Reward) => void;
+}) {
+  const settings = settingsFor(r.currency);
+  const { soldOut, disabled, label } = rewardButtonState(r, pendingByReward, balanceFor, settings);
+  return (
+    <li
+      className={`hover-lift flex flex-col rounded-card border bg-warm-ivory p-4 shadow-soft transition-colors dark:bg-ink-900 ${
+        soldOut
+          ? "border-ink-100 opacity-60 dark:border-ink-800/60"
+          : "border-ink-200/70 dark:border-ink-800/70"
+      }`}
+    >
+      <div className="-mx-4 -mt-4 mb-3">
+        <RewardThumbnail
+          imageUrl={r.imageUrl}
+          name={r.name}
+          className="aspect-[16/9] w-full"
+        />
+      </div>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="min-w-0 text-sm font-semibold text-ink-900 dark:text-ink-100">
+          <span className="break-words">{r.name}</span>
+        </h3>
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-ivory-dim px-2.5 py-1 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
+          <CurrencyIcon name={settings.icon} className="h-3.5 w-3.5" aria-hidden />
+          <span className="font-mono tabular-nums">{r.cost}</span>
+          <span>{r.cost === 1 ? settings.singular : settings.plural}</span>
+        </span>
+      </div>
+      {r.description && (
+        <p className="mt-1 line-clamp-2 text-xs text-ink-500 dark:text-ink-400">{r.description}</p>
+      )}
+      <div className="mt-2 text-xs font-medium text-ink-400 dark:text-ink-500">
+        {r.stock === null ? "In stock" : soldOut ? "Sold out" : `${r.stock} left`}
+      </div>
+      <button
+        onClick={() => onRequest(r)}
+        disabled={disabled}
+        aria-label={
+          disabled
+            ? `${r.name} — ${label}`
+            : `Request ${r.name} for ${r.cost} ${r.cost === 1 ? settings.singular : settings.plural}`
+        }
+        className={`mt-3 flex h-11 w-full items-center justify-center rounded-button px-2 text-center text-xs font-semibold transition-colors ${
+          disabled
+            ? "cursor-not-allowed bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500"
+            : "bg-obsidian dark:bg-antique-gold dark:text-obsidian text-warm-ivory hover:bg-ink-700 dark:hover:bg-deep-gold"
+        }`}
+      >
+        {label}
+      </button>
+    </li>
+  );
+}
+
+/** List row: the compact view — one line per reward, scannable shelf. */
+function RewardRow({
+  reward: r,
+  pendingByReward,
+  balanceFor,
+  settingsFor,
+  onRequest,
+}: {
+  reward: Reward;
+  pendingByReward: Map<string, MyRedemption>;
+  balanceFor: (c: RewardCurrency) => number;
+  settingsFor: (c: RewardCurrency) => CurrencySettings;
+  onRequest: (r: Reward) => void;
+}) {
+  const settings = settingsFor(r.currency);
+  const { soldOut, disabled, label } = rewardButtonState(r, pendingByReward, balanceFor, settings);
+  return (
+    <li
+      className={`hover-lift flex items-center gap-3 rounded-card border bg-warm-ivory p-3 shadow-soft transition-colors dark:bg-ink-900 ${
+        soldOut
+          ? "border-ink-100 opacity-60 dark:border-ink-800/60"
+          : "border-ink-200/70 dark:border-ink-800/70"
+      }`}
+    >
+      <RewardThumbnail
+        imageUrl={r.imageUrl}
+        name={r.name}
+        className="h-14 w-14 shrink-0 rounded-button"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="text-sm font-semibold text-ink-900 dark:text-ink-100">
+            <span className="break-words">{r.name}</span>
+          </h3>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-ivory-dim px-2 py-0.5 text-[11px] font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
+            <CurrencyIcon name={settings.icon} className="h-3 w-3" aria-hidden />
+            <span className="font-mono tabular-nums">{r.cost}</span>
+          </span>
+          <span className="text-[11px] font-medium text-ink-400 dark:text-ink-500">
+            {r.stock === null ? "In stock" : soldOut ? "Sold out" : `${r.stock} left`}
+          </span>
+        </div>
+        {r.description && (
+          <p className="mt-0.5 truncate text-xs text-ink-500 dark:text-ink-400">{r.description}</p>
+        )}
+      </div>
+      <button
+        onClick={() => onRequest(r)}
+        disabled={disabled}
+        aria-label={
+          disabled
+            ? `${r.name} — ${label}`
+            : `Request ${r.name} for ${r.cost} ${r.cost === 1 ? settings.singular : settings.plural}`
+        }
+        className={`flex h-11 min-w-[88px] shrink-0 items-center justify-center gap-1.5 rounded-button px-3 text-center text-xs font-semibold transition-colors ${
+          disabled
+            ? "cursor-not-allowed bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500"
+            : "bg-obsidian dark:bg-antique-gold dark:text-obsidian text-warm-ivory hover:bg-ink-700 dark:hover:bg-deep-gold"
+        }`}
+      >
+        {label}
+      </button>
+    </li>
   );
 }
 
