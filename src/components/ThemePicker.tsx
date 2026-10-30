@@ -53,6 +53,10 @@ export function ThemePicker({
           </button>
         );
       })}
+      <p className="col-span-full mt-1 text-xs leading-snug text-ink-400 dark:text-ink-500">
+        Each theme is a full style pack — it changes cards, avatars and currency badges, not just
+        colours. Light and dark still work in every one.
+      </p>
     </div>
   );
 }

@@ -4,6 +4,7 @@ export const CURRENCY_NAME_MAX = 16;
 
 export const CURRENCY_ICONS: CurrencyIconName[] = [
   "Star", "Ticket", "Gem", "Diamond", "Coins", "DollarSign", "Trophy", "Medal", "Zap", "Heart", "Crown", "Sparkles", "Spark",
+  "Clover", "Leaf", "Flame", "Snowflake", "Droplets", "Rainbow", "Rocket", "Feather", "Shell", "Music", "Gamepad2", "Candy", "Hexagon",
 ];
 
 export const CURRENCY_COLORS: Record<CurrencyColor, { icon: string; swatch: string; soft: string }> = {

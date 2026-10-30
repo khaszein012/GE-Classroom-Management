@@ -174,11 +174,110 @@
 *::-webkit-scrollbar-thumb { background: rgb(var(--c-ink-300)); border-radius: 4px; }
 .dark *::-webkit-scrollbar-thumb { background: rgb(var(--c-ink-600)); }
 
-/* Printed output (e.g. login cards) stays high-contrast in greyscale
-   regardless of theme: pin every token to the Genji values in print, and
-   keep backgrounds plain so the grain never prints. */
+/* ===== Theme style packs ==================================================
+   Each theme is more than a palette: it restyles corner radius, page
+   background, avatar shape and currency-icon treatment via [data-theme]
+   overrides on shared classes. Components never know — pure CSS. Unlayered
+   so it always beats the @layer base defaults. */
+
+/* Indigo Night — crisp, angular, cool. Squircle avatars, squared cards,
+   fine diagonal grid, squircle currency discs. */
+[data-theme="indigo"] .rounded-card { border-radius: 10px; }
+[data-theme="indigo"] .rounded-t-card { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+[data-theme="indigo"] .rounded-button { border-radius: 6px; }
+[data-theme="indigo"] .monogram { border-radius: 12px; }
+[data-theme="indigo"] .currency-glyph {
+  padding: 2px;
+  border-radius: 6px;
+  background: rgb(var(--c-antique-gold) / 0.14);
+}
+[data-theme="indigo"] .shadow-soft { box-shadow: 0 1px 2px rgb(18 22 60 / 0.08); }
+[data-theme="indigo"] .shadow-soft-md { box-shadow: 0 3px 10px rgb(18 22 60 / 0.10); }
+[data-theme="indigo"] .shadow-soft-lg { box-shadow: 0 14px 36px rgb(18 22 60 / 0.16); }
+[data-theme="indigo"] body {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M28 0H0v28' fill='none' stroke='%23121640' stroke-opacity='0.05'/%3E%3C/svg%3E");
+}
+html.dark[data-theme="indigo"] body {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M28 0H0v28' fill='none' stroke='%23aeb4f0' stroke-opacity='0.05'/%3E%3C/svg%3E"),
+    radial-gradient(1100px 520px at 50% -8%, rgb(var(--c-antique-gold) / 0.07), transparent 62%);
+}
+
+/* Sage Press — soft, rounded, botanical. Extra-round cards, dotted paper,
+   ringed circle avatars, ringed currency coins. */
+[data-theme="sage"] .rounded-card { border-radius: 20px; }
+[data-theme="sage"] .rounded-t-card { border-top-left-radius: 20px; border-top-right-radius: 20px; }
+[data-theme="sage"] .rounded-button { border-radius: 12px; }
+[data-theme="sage"] .monogram {
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.35);
+}
+[data-theme="sage"] .currency-glyph {
+  padding: 2px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 1.5px rgb(var(--c-antique-gold) / 0.45);
+}
+[data-theme="sage"] .shadow-soft { box-shadow: 0 1px 2px rgb(30 60 32 / 0.08); }
+[data-theme="sage"] .shadow-soft-md { box-shadow: 0 3px 10px rgb(30 60 32 / 0.10); }
+[data-theme="sage"] .shadow-soft-lg { box-shadow: 0 14px 36px rgb(30 60 32 / 0.15); }
+[data-theme="sage"] body {
+  background-image:
+    radial-gradient(rgb(var(--c-ink-400) / 0.10) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+html.dark[data-theme="sage"] body {
+  background-image:
+    radial-gradient(rgb(var(--c-ink-200) / 0.07) 1px, transparent 1px),
+    radial-gradient(1100px 520px at 50% -8%, rgb(var(--c-antique-gold) / 0.07), transparent 62%);
+  background-size: 22px 22px, auto;
+}
+
+/* Plum Dusk — bubbly sticker vibe. Bubble cards, blob background,
+   sticker avatars with an ivory ring, filled currency discs. */
+[data-theme="plum"] .rounded-card { border-radius: 24px; }
+[data-theme="plum"] .rounded-t-card { border-top-left-radius: 24px; border-top-right-radius: 24px; }
+[data-theme="plum"] .rounded-button { border-radius: 14px; }
+[data-theme="plum"] .monogram {
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px rgb(var(--c-warm-ivory) / 0.75);
+}
+[data-theme="plum"] .currency-glyph {
+  padding: 3px;
+  border-radius: 9999px;
+  background: rgb(var(--c-antique-gold) / 0.20);
+}
+[data-theme="plum"] .shadow-soft { box-shadow: 0 1px 2px rgb(64 20 52 / 0.09); }
+[data-theme="plum"] .shadow-soft-md { box-shadow: 0 3px 10px rgb(64 20 52 / 0.11); }
+[data-theme="plum"] .shadow-soft-lg { box-shadow: 0 14px 36px rgb(64 20 52 / 0.17); }
+[data-theme="plum"] body {
+  background-image:
+    radial-gradient(420px 320px at 12% 8%, rgb(var(--c-antique-gold) / 0.09), transparent 70%),
+    radial-gradient(520px 380px at 88% 92%, rgb(var(--c-warm-brick) / 0.07), transparent 70%);
+}
+html.dark[data-theme="plum"] body {
+  background-image:
+    radial-gradient(420px 320px at 12% 8%, rgb(var(--c-antique-gold) / 0.10), transparent 70%),
+    radial-gradient(520px 380px at 88% 92%, rgb(var(--c-brick-light) / 0.08), transparent 70%),
+    radial-gradient(1100px 520px at 50% -8%, rgb(var(--c-antique-gold) / 0.06), transparent 62%);
+}
+
+/* Printed output keeps the Genji pin: style packs never reach paper. */
 @media print {
-  html, html[data-theme="indigo"], html[data-theme="sage"], html[data-theme="plum"] {
+  [data-theme] .rounded-card,
+  [data-theme] .rounded-t-card,
+  [data-theme] .rounded-button,
+  [data-theme] .monogram,
+  [data-theme] .currency-glyph {
+    border-radius: 6px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    box-shadow: none;
+    background-image: none;
+    background-color: transparent;
+    padding: 0;
+  }
+  html[data-theme="indigo"] body, html[data-theme="sage"] body, html[data-theme="plum"] body {
     --c-obsidian: 11 13 16;
     --c-antique-gold: 198 161 91;
     --c-warm-ivory: 244 240 231;

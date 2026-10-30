@@ -1,15 +1,28 @@
 import {
+  Candy,
+  Clover,
   Coins,
   Crown,
   Diamond,
   DollarSign,
+  Feather,
+  Flame,
+  Gamepad2,
   Gem,
   Heart,
+  Hexagon,
+  Leaf,
   Medal,
+  Music,
+  Rainbow,
+  Rocket,
+  Shell,
+  Snowflake,
   Sparkles,
   Star,
   Ticket,
   Trophy,
+  Droplets,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +44,19 @@ const ICONS: Record<CurrencyIconName, LucideIcon> = {
   Crown,
   Sparkles,
   Spark: Sparkles,
+  Clover,
+  Leaf,
+  Flame,
+  Snowflake,
+  Droplets,
+  Rainbow,
+  Rocket,
+  Feather,
+  Shell,
+  Music,
+  Gamepad2,
+  Candy,
+  Hexagon,
 };
 
 export function CurrencyIcon({
@@ -77,7 +103,7 @@ export function CurrencyAmount({
     <span className={`inline-flex items-center gap-1 ${className}`}>
       <CurrencyIcon
         name={settings.icon}
-        className={`shrink-0 ${CURRENCY_COLORS[settings.color].icon} ${iconClassName}`}
+        className={`currency-glyph shrink-0 ${CURRENCY_COLORS[settings.color].icon} ${iconClassName}`}
         strokeWidth={2.25}
       />
       <span className="font-mono tabular-nums">

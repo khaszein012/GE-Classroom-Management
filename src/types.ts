@@ -35,7 +35,20 @@ export type CurrencyIconName =
   | "Heart"
   | "Crown"
   | "Sparkles"
-  | "Spark";
+  | "Spark"
+  | "Clover"
+  | "Leaf"
+  | "Flame"
+  | "Snowflake"
+  | "Droplets"
+  | "Rainbow"
+  | "Rocket"
+  | "Feather"
+  | "Shell"
+  | "Music"
+  | "Gamepad2"
+  | "Candy"
+  | "Hexagon";
 
 export type CurrencyColor =
   | "amber"

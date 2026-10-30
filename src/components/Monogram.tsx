@@ -39,7 +39,7 @@ export function Monogram({
   const c = avatarColorDef(colorIndex);
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold tracking-tight ${c.bg} ${c.text} ${SIZE_CLASSES[size]} ${className} ${ring} ring-1 ${c.ring}`}
+      className={`monogram relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold tracking-tight ${c.bg} ${c.text} ${SIZE_CLASSES[size]} ${className} ${ring} ring-1 ${c.ring}`}
     >
       <span className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
       <span className="absolute left-0 right-0 top-0 h-1/2 bg-gradient-to-b from-white/12 to-transparent" />
