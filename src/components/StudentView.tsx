@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LogOut, Palette } from "lucide-react";
+import { LogOut, Palette, PartyPopper, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as storage from "@/lib/storage";
 import type { StudentSafeRow } from "@/lib/storage";
@@ -19,6 +19,8 @@ import type { MyQuizItem, RewardRow } from "@/lib/storage";
 import { getMyQuizList, getShopRewards } from "@/lib/storage";
 import { applyColorTheme, isColorTheme, type ColorTheme } from "@/lib/themes";
 import { ThemePicker } from "@/components/ThemePicker";
+import { levelProgress, levelForXp } from "@/lib/levels";
+import { Confetti } from "@/components/student/Confetti";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import type { CurrencySettings, PointTransaction } from "@/types";
 
@@ -207,6 +209,47 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
     if (prev !== null && balance > prev) setShineKey((k) => k + 1);
   }, [balance]);
 
+  // Levels are derived from lifetime earned (see lib/levels.ts): nothing
+  // stored, nothing student-writable. A live crossing fires the full-screen
+  // celebration; a level gained while away shows a quiet welcome-back note.
+  const lifetime = row?.lifetime_earned ?? 0;
+  const level = levelProgress(lifetime);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+  const prevLifetimeRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevLifetimeRef.current;
+    prevLifetimeRef.current = lifetime;
+    if (prev !== null && row) {
+      const newLevel = levelForXp(lifetime);
+      if (newLevel > levelForXp(prev)) {
+        setLevelUp(newLevel);
+        localStorage.setItem(`cr_level_seen_${row.id}`, String(newLevel));
+      }
+    }
+  }, [lifetime, row]);
+
+  const [welcomeLevel, setWelcomeLevel] = useState<number | null>(null);
+  useEffect(() => {
+    if (loading || !row) return;
+    const key = `cr_level_seen_${row.id}`;
+    const lvl = levelForXp(row.lifetime_earned ?? 0);
+    const seen = Number(localStorage.getItem(key) ?? "0");
+    if (seen === 0) {
+      // First visit since levels shipped: record silently, no retroactive fanfare.
+      localStorage.setItem(key, String(lvl));
+    } else if (lvl > seen) {
+      setWelcomeLevel(lvl);
+      localStorage.setItem(key, String(lvl));
+    }
+  }, [loading, row]);
+
+  // Auto-advance the live level-up celebration.
+  useEffect(() => {
+    if (levelUp === null) return;
+    const t = setTimeout(() => setLevelUp(null), 4500);
+    return () => clearTimeout(t);
+  }, [levelUp]);
+
   const goal: Goal = {
     target: row?.goal_target ?? null,
     label: row?.goal_label ?? null,
@@ -289,6 +332,54 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="flex min-h-screen flex-col bg-ink-50 dark:bg-ink-950">
       <ReconnectBanner />
+
+      {/* Level-up: live crossing of a threshold — full celebration */}
+      {levelUp !== null && (
+        <div
+          className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-hidden bg-ink-50 px-5 text-center dark:bg-ink-950"
+          role="alertdialog"
+          aria-label={`Level ${levelUp} reached`}
+        >
+          <Confetti />
+          <div className="relative z-10 flex flex-col items-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ivory-dim text-deep-gold shadow-soft dark:bg-antique-gold/10 dark:text-antique-gold">
+              <PartyPopper className="h-8 w-8" aria-hidden />
+            </span>
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+              Level up
+            </p>
+            <p className="mt-1 font-mono text-7xl font-extrabold tabular-nums tracking-tight text-ink-900 dark:text-warm-ivory sm:text-8xl">
+              {levelUp}
+            </p>
+            <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
+              Keep earning to reach Level {levelUp + 1}
+            </p>
+            <button
+              onClick={() => setLevelUp(null)}
+              className="mt-7 min-h-11 rounded-button bg-obsidian px-5 py-2.5 text-sm font-bold text-warm-ivory transition-colors hover:bg-ink-700 dark:bg-antique-gold dark:text-obsidian dark:hover:bg-deep-gold"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quiet note when a level was gained while away */}
+      {welcomeLevel !== null && (
+        <div className="fixed inset-x-4 top-20 z-40 mx-auto flex max-w-sm animate-slide-up items-center gap-2.5 rounded-card border border-deep-gold/30 bg-ivory-dim px-4 py-3 shadow-soft-lg dark:border-antique-gold/30 dark:bg-ink-800">
+          <PartyPopper className="h-4 w-4 shrink-0 text-deep-gold dark:text-antique-gold" aria-hidden />
+          <p className="flex-1 text-left text-xs font-medium text-ink-700 dark:text-ink-200">
+            While you were away you reached <strong>Level {welcomeLevel}</strong>!
+          </p>
+          <button
+            onClick={() => setWelcomeLevel(null)}
+            aria-label="Dismiss"
+            className="shrink-0 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       {/* Quiet notifications (bottom-right, auto-dismiss) */}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2">
         {notes.map((n) => (
@@ -312,6 +403,12 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
             >
               <Monogram name={row.display_name} colorIndex={row.avatar_color} size="md" />
             </button>
+            <span
+              className="pointer-events-none absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-obsidian px-1 font-mono text-[9px] font-bold tabular-nums text-warm-ivory ring-2 ring-ink-50 dark:bg-antique-gold dark:text-obsidian dark:ring-ink-950"
+              aria-label={`Level ${level.level}`}
+            >
+              {level.level}
+            </span>
             {colorOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setColorOpen(false)} />
@@ -342,7 +439,15 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
             )}
           </div>
           <div>
-            <h1 className="max-w-[140px] truncate text-[15px] font-bold leading-tight text-ink-900 dark:text-warm-ivory sm:max-w-[220px]">{row.display_name}</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="max-w-[140px] truncate text-[15px] font-bold leading-tight text-ink-900 dark:text-warm-ivory sm:max-w-[220px]">{row.display_name}</h1>
+              <span
+                className="shrink-0 rounded-full bg-ivory-dim px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold"
+                title="Your level — grows as you earn"
+              >
+                LV {level.level}
+              </span>
+            </div>
             <p className="text-[11px] text-ink-400 dark:text-ink-500">
               {tab === "rewards" ? "My rewards" : tab === "shop" ? "Shop" : "Quizzes"}
             </p>
@@ -430,6 +535,28 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
               <p className="mt-1 text-sm font-medium text-ink-400 dark:text-ink-500">
                 {row.balance === 1 ? currency.singular : currency.plural}
               </p>
+              {/* Level progress — personal pace against the curve, never vs classmates */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+                  <span className="normal-case">Level {level.level}</span>
+                  <span className="font-mono normal-case tabular-nums">
+                    {level.needed} to Level {level.level + 1}
+                  </span>
+                </div>
+                <div
+                  className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={level.pct}
+                  aria-label={`Level ${level.level} progress`}
+                >
+                  <div
+                    className="h-full rounded-full bg-antique-gold transition-all duration-500"
+                    style={{ width: `${level.pct}%` }}
+                  />
+                </div>
+              </div>
               <div className="mt-5 border-t border-ink-100 pt-4 dark:border-ink-800">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-ink-400 dark:text-ink-500">
                   Lifetime earned

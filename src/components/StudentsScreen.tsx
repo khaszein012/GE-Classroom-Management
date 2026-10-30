@@ -12,6 +12,7 @@ import { ColorPicker } from "@/components/Modal";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { CurrencyAmount } from "@/components/CurrencyAmount";
 import { generatePin, suggestUsername } from "@/lib/pin";
+import { levelProgress } from "@/lib/levels";
 import { formatDate } from "@/lib/time";
 import { SORT_LABELS, loadSortMode, saveSortMode, sortStudents } from "@/lib/sortStudents";
 import type { SortMode } from "@/lib/sortStudents";
@@ -23,7 +24,7 @@ interface Props {
 }
 
 export function StudentsScreen({ store, onPrintCards }: Props) {
-  const { students, totals } = store;
+  const { students, totals, lifetime } = store;
   const { config } = useCurrency();
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
@@ -230,6 +231,7 @@ export function StudentsScreen({ store, onPrintCards }: Props) {
               <ul className="divide-y divide-ink-100 dark:divide-ink-800">
                 {sortedStudents.map((s) => {
                   const total = totals[s.id] ?? 0;
+                  const level = levelProgress(lifetime[s.id] ?? 0).level;
                   const pillClass =
                     total > 0
                       ? "bg-ivory-dim text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold"
@@ -243,6 +245,12 @@ export function StudentsScreen({ store, onPrintCards }: Props) {
                         <div className="flex items-center gap-2">
                           <span className="truncate text-[15px] font-medium text-ink-900 dark:text-ink-100">
                             {s.displayName}
+                          </span>
+                          <span
+                            className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums text-ink-600 dark:bg-ink-800 dark:text-ink-300"
+                            title={`Level ${level} (lifetime earned)`}
+                          >
+                            LV {level}
                           </span>
                           {!s.hasPin ? (
                             <span className="shrink-0 rounded-full bg-ivory-dim px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">

@@ -6,7 +6,8 @@ export type SortMode =
   | "balance-high"
   | "balance-low"
   | "recent"
-  | "needs-pin";
+  | "needs-pin"
+  | "level-high";
 
 export const SORT_LABELS: Record<SortMode, string> = {
   "name-asc": "Name A–Z",
@@ -15,6 +16,7 @@ export const SORT_LABELS: Record<SortMode, string> = {
   "balance-low": "Balance, lowest first",
   "recent": "Recently active",
   "needs-pin": "Needs PIN first",
+  "level-high": "Level, highest first",
 };
 
 const STORAGE_KEY = "teacher-sort-mode";
@@ -76,6 +78,22 @@ export function sortStudents(
         if (a.hasPin !== b.hasPin) return a.hasPin ? 1 : -1;
         return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
       });
+
+    // Lifetime earned drives levels (spending never reduces it), so this is
+    // a stable level ordering.
+    case "level-high": {
+      const lifetime = new Map<string, number>();
+      for (const t of transactions) {
+        if (t.isUndone || t.amount <= 0 || t.type === "achievement") continue;
+        lifetime.set(t.studentId, (lifetime.get(t.studentId) ?? 0) + t.amount);
+      }
+      return sorted.sort((a, b) => {
+        const la = lifetime.get(a.id) ?? 0;
+        const lb = lifetime.get(b.id) ?? 0;
+        if (lb !== la) return lb - la;
+        return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
+      });
+    }
 
     case "recent": {
       const lastTxByStudent = new Map<string, number>();
