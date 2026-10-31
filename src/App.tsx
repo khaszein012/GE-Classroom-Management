@@ -132,7 +132,7 @@ function MainApp({
         ) : (
           <div key={screen} className="h-full animate-slide-up">
             {screen === "dashboard" && (
-              <Dashboard store={store} onGoToStudents={() => setScreen("students")} />
+              <Dashboard store={store} onGoToStudents={() => setScreen("students")} onGoToSettings={() => setScreen("settings")} />
             )}
             {screen === "students" && (
               <StudentsScreen store={store} onPrintCards={() => setPrinting(true)} />

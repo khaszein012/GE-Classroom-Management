@@ -16,9 +16,10 @@ import type { SortMode } from "@/lib/sortStudents";
 interface Props {
   store: Store;
   onGoToStudents: () => void;
+  onGoToSettings: () => void;
 }
 
-export function Dashboard({ store, onGoToStudents }: Props) {
+export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
   const { students, behaviors, transactions, totals } = store;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [awardOpen, setAwardOpen] = useState(false);
@@ -65,6 +66,17 @@ export function Dashboard({ store, onGoToStudents }: Props) {
     const classAverage = studentCount === 0 ? 0 : classTotal / studentCount;
     return { pointsToday, awardsToday, classTotal, classAverage, studentCount };
   }, [transactions, totals, students.length]);
+
+  // Class-goal earned progress: positive behaviour earnings across the class
+  // (same derivation as the student card and the Settings preview).
+  const earnedTotal = useMemo(
+    () =>
+      transactions.reduce(
+        (sum, t) => (t.isUndone || t.amount <= 0 || t.type === "achievement" ? sum : sum + t.amount),
+        0,
+      ),
+    [transactions],
+  );
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -164,6 +176,57 @@ export function Dashboard({ store, onGoToStudents }: Props) {
             <StatStrip {...stats} />
           )}
         </div>
+
+        {/* Class goal — live progress at a glance; edit in Settings */}
+        {store.classGoal.target !== null && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-ink-200/70 bg-warm-ivory px-4 py-3 shadow-soft dark:border-ink-800/70 dark:bg-ink-900">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+                Class goal
+              </p>
+              <p className="truncate text-sm font-semibold text-ink-900 dark:text-warm-ivory">
+                {store.classGoal.label || "Our class goal"}
+              </p>
+            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-ink-800 dark:text-ink-100">
+                {earnedTotal}
+                <span className="font-normal text-ink-400 dark:text-ink-500"> / {store.classGoal.target}</span>
+              </span>
+              <div
+                className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={store.classGoal.target}
+                aria-valuenow={Math.min(earnedTotal, store.classGoal.target)}
+                aria-label="Class goal progress"
+              >
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    earnedTotal >= store.classGoal.target
+                      ? "bg-deep-gold dark:bg-antique-gold"
+                      : "bg-antique-gold/70"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, Math.round((earnedTotal / store.classGoal.target) * 100))}%`,
+                  }}
+                />
+              </div>
+              {earnedTotal >= store.classGoal.target && (
+                <span className="shrink-0 text-xs font-bold text-deep-gold dark:text-antique-gold">
+                  Reached!
+                </span>
+              )}
+            </div>
+            <button
+              onClick={onGoToSettings}
+              className="ml-auto shrink-0 text-xs font-semibold text-deep-gold transition-colors hover:text-ink-700 dark:text-antique-gold dark:hover:text-ink-100"
+              aria-label="Edit class goal in Settings"
+            >
+              Edit
+            </button>
+          </div>
+        )}
 
         {/* Search */}
         {students.length > 0 && (
