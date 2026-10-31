@@ -240,7 +240,15 @@ export function StudentsScreen({ store, onPrintCards }: Props) {
                         : "bg-ink-100 text-ink-500 dark:bg-ink-800 dark:text-ink-400";
                   return (
                     <li key={s.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
-                      <Monogram name={s.displayName} colorIndex={s.avatarColor} size="md" />
+                      <div className="relative shrink-0">
+                        <Monogram name={s.displayName} colorIndex={s.avatarColor} size="md" />
+                        <span
+                          className="pointer-events-none absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-obsidian px-1 font-mono text-[9px] font-bold tabular-nums text-warm-ivory ring-2 ring-warm-ivory dark:bg-antique-gold dark:text-obsidian dark:ring-ink-900"
+                          aria-label={`Level ${level}`}
+                        >
+                          {level}
+                        </span>
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="truncate text-[15px] font-medium text-ink-900 dark:text-ink-100">

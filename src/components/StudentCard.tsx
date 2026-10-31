@@ -2,11 +2,13 @@ import { Check, Minus, Plus } from "lucide-react";
 import { Monogram } from "@/components/Monogram";
 import { useCountUp } from "@/lib/useCountUp";
 import { CurrencyAmount } from "@/components/CurrencyAmount";
+import { levelProgress } from "@/lib/levels";
 
 interface Props {
   colorIndex: number;
   name: string;
   total: number;
+  lifetime: number;
   selected: boolean;
   pulsing: boolean;
   onClick: () => void;
@@ -18,6 +20,7 @@ export function StudentCard({
   colorIndex,
   name,
   total,
+  lifetime,
   selected,
   pulsing,
   onClick,
@@ -25,6 +28,7 @@ export function StudentCard({
   onQuickMinus,
 }: Props) {
   const animatedTotal = useCountUp(total);
+  const level = levelProgress(lifetime);
 
   const pillClass =
     total > 0
@@ -43,10 +47,18 @@ export function StudentCard({
           : "border-transparent hover:border-ink-200 dark:hover:border-ink-700"
       }`}
     >
-      {/* Avatar */}
-      <Monogram name={name} colorIndex={colorIndex} size="lg" />
+      {/* Avatar + level badge */}
+      <div className="relative shrink-0">
+        <Monogram name={name} colorIndex={colorIndex} size="lg" />
+        <span
+          className="pointer-events-none absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-obsidian px-1 font-mono text-[9px] font-bold tabular-nums text-warm-ivory ring-2 ring-warm-ivory dark:bg-antique-gold dark:text-obsidian dark:ring-ink-900"
+          aria-label={`Level ${level.level}`}
+        >
+          {level.level}
+        </span>
+      </div>
 
-      {/* Name + total */}
+      {/* Name + total + level progress */}
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] font-medium text-ink-800 dark:text-ink-100">
           {name}
@@ -57,6 +69,20 @@ export function StudentCard({
           >
             <CurrencyAmount amount={animatedTotal} variant="compact" iconClassName="h-3.5 w-3.5" />
           </span>
+        </div>
+        <div
+          className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={level.pct}
+          aria-label={`${name}: Level ${level.level} progress`}
+          title={`Level ${level.level} · ${level.needed} to Level ${level.level + 1}`}
+        >
+          <div
+            className="h-full rounded-full bg-antique-gold/70 transition-all duration-500"
+            style={{ width: `${level.pct}%` }}
+          />
         </div>
       </div>
 

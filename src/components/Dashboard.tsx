@@ -224,6 +224,7 @@ export function Dashboard({ store, onGoToStudents }: Props) {
                   colorIndex={index}
                   name={s.displayName}
                   total={totals[s.id] ?? 0}
+                  lifetime={store.lifetime[s.id] ?? 0}
                   selected={selected.has(s.id)}
                   pulsing={pulse.has(s.id)}
                   onClick={() => toggle(s.id)}
