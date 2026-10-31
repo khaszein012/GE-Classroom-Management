@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownUp, Award, CheckSquare, Search, Square, UserPlus, Users } from "lucide-react";
+import { ArrowDownUp, Award, CheckSquare, Dices, Search, Square, Timer, UserPlus, Users } from "lucide-react";
 import type { Store } from "@/lib/useStore";
 import { useToast } from "@/components/Toast";
 import { AwardModal, selectedIdsRef } from "@/components/AwardModal";
@@ -12,6 +12,8 @@ import { useCurrency } from "@/components/CurrencyProvider";
 import { formatCurrency } from "@/lib/currency";
 import { SORT_LABELS, loadSortMode, saveSortMode, sortStudents } from "@/lib/sortStudents";
 import type { SortMode } from "@/lib/sortStudents";
+import { PickerOverlay } from "@/components/PickerOverlay";
+import { TimerOverlay } from "@/components/TimerOverlay";
 
 interface Props {
   store: Store;
@@ -29,6 +31,8 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
   const [loading, setLoading] = useState(true);
   const [quickBusy, setQuickBusy] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(() => loadSortMode());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [timerOpen, setTimerOpen] = useState(false);
   const toast = useToast();
   const { config } = useCurrency();
 
@@ -149,6 +153,25 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {students.length > 0 && (
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="flex h-10 items-center gap-2 rounded-button border border-ink-200 bg-warm-ivory px-3 text-sm font-semibold text-ink-700 transition-colors hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+                aria-label="Pick a random student"
+                title="Pick a random student"
+              >
+                <Dices className="h-4 w-4" />
+                <span className="hidden xl:inline">Pick</span>
+              </button>
+            )}
+            <button
+              onClick={() => setTimerOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-button border border-ink-200 bg-warm-ivory text-ink-700 transition-colors hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+              aria-label="Open classroom timer"
+              title="Classroom timer"
+            >
+              <Timer className="h-4 w-4" />
+            </button>
             {students.length > 0 && (
               <button
                 onClick={allSelected ? clear : selectAll}
@@ -342,6 +365,16 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
         onClose={() => setAwardOpen(false)}
         onAwarded={handleAwarded}
       />
+
+      {pickerOpen && (
+        <PickerOverlay
+          students={students
+            .filter((s) => s.isActive)
+            .map((s) => ({ id: s.id, displayName: s.displayName, avatarColor: s.avatarColor }))}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+      {timerOpen && <TimerOverlay onClose={() => setTimerOpen(false)} />}
 
       <QuickAddStudent
         open={addOpen}

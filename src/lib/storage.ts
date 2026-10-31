@@ -308,6 +308,35 @@ export async function saveClassGoal(goal: { target: number | null; label: string
   if (error) throw error;
 }
 
+/** Achievement stats for the signed-in student (secure aggregate RPC). */
+export async function getMyAchievementStats(): Promise<{
+  total_awards: number;
+  lifetime_earned: number;
+  quizzes_taken: number;
+  perfect_quizzes: number;
+  rewards_redeemed: number;
+  award_days: string[];
+}> {
+  const { data, error } = await supabase.rpc("my_achievement_stats");
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as {
+    total_awards: number;
+    lifetime_earned: number;
+    quizzes_taken: number;
+    perfect_quizzes: number;
+    rewards_redeemed: number;
+    award_days: string[] | null;
+  };
+  return {
+    total_awards: r.total_awards ?? 0,
+    lifetime_earned: r.lifetime_earned ?? 0,
+    quizzes_taken: r.quizzes_taken ?? 0,
+    perfect_quizzes: r.perfect_quizzes ?? 0,
+    rewards_redeemed: r.rewards_redeemed ?? 0,
+    award_days: r.award_days ?? [],
+  };
+}
+
 // ---------- Student self-read (student sessions) ----------
 
 export interface StudentSafeRow {

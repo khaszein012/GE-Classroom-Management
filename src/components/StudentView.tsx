@@ -21,7 +21,9 @@ import { applyColorTheme, isColorTheme, type ColorTheme } from "@/lib/themes";
 import { ThemePicker } from "@/components/ThemePicker";
 import { levelProgress, levelForXp } from "@/lib/levels";
 import { Confetti } from "@/components/student/Confetti";
-import { getClassGoalProgress, type ClassGoalProgress } from "@/lib/storage";
+import { getClassGoalProgress, getMyAchievementStats, type ClassGoalProgress } from "@/lib/storage";
+import { buildAchievementStats, type AchievementStats } from "@/lib/achievements";
+import { AchievementsCard } from "@/components/student/AchievementsCard";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import type { CurrencySettings, PointTransaction } from "@/types";
 
@@ -49,6 +51,7 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const [quizzesError, setQuizzesError] = useState<string | null>(null);
   const [autoStartId, setAutoStartId] = useState<string | null>(null);
   const [shopRewards, setShopRewards] = useState<GoalRewardPreset[]>([]);
+  const [achvStats, setAchvStats] = useState<AchievementStats | null>(null);
   const [classGoal, setClassGoal] = useState<ClassGoalProgress | null>(null);
   const [notes, setNotes] = useState<{ id: number; message: string }[]>([]);
   const [colorOpen, setColorOpen] = useState(false);
@@ -75,6 +78,10 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
       getClassGoalProgress()
         .then((g) => setClassGoal(g.target !== null ? g : null))
         .catch(() => setClassGoal(null));
+      getMyAchievementStats()
+        .then(buildAchievementStats)
+        .then(setAchvStats)
+        .catch(() => setAchvStats(null));
       const mapped = txns.map(storage.mapTransactionRow);
       if (markNew && prevIds) {
         const fresh = mapped.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
@@ -720,6 +727,15 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
                 onLoadMore={() => void loadMore()}
               />
             </section>
+
+            {/* Achievements — milestone badges + earning streak */}
+            {achvStats && (
+              <AchievementsCard
+                stats={achvStats}
+                level={level.level}
+                className="lg:col-span-4 lg:col-start-9 lg:row-start-4"
+              />
+            )}
 
             <section
               className={`rounded-card border border-ink-200/70 bg-warm-ivory p-6 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-4 lg:col-start-9 ${
