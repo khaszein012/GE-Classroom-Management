@@ -13,6 +13,8 @@ import {
   validateCurrencyName,
 } from "@/lib/currency";
 import { CurrencyAmount, CurrencyIcon } from "@/components/CurrencyAmount";
+import { useCurrency } from "@/components/CurrencyProvider";
+import { useToast } from "@/components/Toast";
 import { ThemePicker } from "@/components/ThemePicker";
 import type { ColorTheme } from "@/lib/themes";
 
@@ -88,6 +90,19 @@ export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetr
 
         <section className="mt-8">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+            Class goal
+          </h2>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            A shared target every student works toward — it shows on their dashboard and grows as
+            the class earns {config.behavior.plural.toLowerCase()}.
+          </p>
+          <div className="mt-4">
+            <ClassGoalEditor store={store} />
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
             Class currency
           </h2>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
@@ -117,8 +132,135 @@ export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetr
   );
 }
 
-function ExportSection({ store }: { store: Store }) {
-  const [busy, setBusy] = useState<string | null>(null);
+/** Teacher editor for the shared class goal; progress derives from the ledger. */
+function ClassGoalEditor({ store }: { store: Store }) {
+  const { config } = useCurrency();
+  const toast = useToast();
+  const [draftTarget, setDraftTarget] = useState(store.classGoal.target?.toString() ?? "");
+  const [draftLabel, setDraftLabel] = useState(store.classGoal.label ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const target = parseInt(draftTarget, 10);
+  const validTarget = Number.isFinite(target) && target >= 1;
+  const earned = store.transactions.reduce(
+    (sum, t) => (t.isUndone || t.amount <= 0 || t.type === "achievement" ? sum : sum + t.amount),
+    0,
+  );
+  const pct = validTarget ? Math.min(100, Math.round((earned / target) * 100)) : 0;
+  const reached = validTarget && earned >= target;
+
+  const save = async () => {
+    if (draftTarget.trim() === "") {
+      // Clearing the goal
+      setSaving(true);
+      try {
+        await store.saveClassGoal({ target: null, label: null });
+        toast.show("Class goal cleared", "info");
+      } catch {
+        toast.show("Could not clear the goal — try again", "negative");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+    if (!validTarget) {
+      toast.show("Target must be a positive whole number", "negative");
+      return;
+    }
+    setSaving(true);
+    try {
+      await store.saveClassGoal({ target, label: draftLabel.trim() || null });
+      toast.show("Class goal saved", "positive");
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Could not save — try again", "negative");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-card border border-ink-200/70 bg-warm-ivory p-4 shadow-soft dark:border-ink-800/70 dark:bg-ink-900">
+      <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
+            What is the class working toward?
+          </label>
+          <input
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            placeholder="e.g. Class party, movie afternoon…"
+            maxLength={60}
+            className="h-10 w-full rounded-button border border-ink-200 bg-warm-ivory px-3 text-sm outline-none transition-colors placeholder:text-ink-400 focus:border-antique-gold focus:ring-2 focus:ring-antique-gold/20 dark:border-ink-700 dark:bg-ink-800"
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-700 dark:text-ink-200">
+            Target ({config.behavior.plural.toLowerCase()} earned)
+          </label>
+          <input
+            inputMode="numeric"
+            value={draftTarget}
+            onChange={(e) => setDraftTarget(e.target.value.replace(/\D/g, "").slice(0, 7))}
+            placeholder="e.g. 500"
+            className="h-10 w-full rounded-button border border-ink-200 bg-warm-ivory px-3 font-mono text-sm tabular-nums outline-none transition-colors placeholder:font-sans placeholder:text-ink-400 focus:border-antique-gold focus:ring-2 focus:ring-antique-gold/20 dark:border-ink-700 dark:bg-ink-800"
+          />
+        </div>
+      </div>
+
+      {validTarget ? (
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs font-medium text-ink-500 dark:text-ink-400">
+            <span>
+              Class has earned{" "}
+              <span className="font-mono font-bold tabular-nums text-ink-800 dark:text-ink-100">
+                {earned}
+              </span>{" "}
+              of {target} {target === 1 ? config.behavior.singular.toLowerCase() : config.behavior.plural.toLowerCase()}
+            </span>
+            <span className={reached ? "font-bold text-deep-gold dark:text-antique-gold" : "font-mono tabular-nums"}>
+              {pct}%
+            </span>
+          </div>
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
+            <div
+              className="h-full rounded-full bg-antique-gold transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-ink-400 dark:text-ink-500">
+          No target set — students won't see a class goal until you add one.
+        </p>
+      )}
+
+      <div className="mt-4 flex justify-end gap-2">
+        {store.classGoal.target !== null && (
+          <button
+            onClick={() => {
+              setDraftTarget("");
+              setDraftLabel("");
+              void save();
+            }}
+            disabled={saving}
+            className="min-h-11 rounded-button px-3 py-2 text-xs font-semibold text-warm-brick transition-colors hover:bg-warm-brick/10 disabled:opacity-50 dark:text-brick-light"
+          >
+            Clear goal
+          </button>
+        )}
+        <button
+          onClick={() => void save()}
+          disabled={saving}
+          className="min-h-11 rounded-button bg-obsidian px-4 py-2 text-xs font-bold text-warm-ivory transition-colors hover:bg-ink-700 disabled:opacity-60 dark:bg-antique-gold dark:text-obsidian dark:hover:bg-deep-gold"
+        >
+          {saving ? "Saving…" : "Save class goal"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ExportSection({ store }: { store: Store }) {  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
 

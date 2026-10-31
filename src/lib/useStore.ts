@@ -27,6 +27,10 @@ export function useStore() {
   const [quizzesError, setQuizzesError] = useState<string | null>(null);
   const [currencyConfig, setCurrencyConfig] = useState<CurrencyConfig>(DEFAULT_CURRENCY_CONFIG);
   const [colorTheme, setColorTheme] = useState<ColorTheme>("genji");
+  const [classGoal, setClassGoal] = useState<{ target: number | null; label: string | null }>({
+    target: null,
+    label: null,
+  });
 
   const applyDerived = useCallback((txns: PointTransaction[]) => {
     const totalsMap: Record<string, number> = {};
@@ -61,6 +65,7 @@ export function useStore() {
       setRedemptions(rd);
       if (settings) setCurrencyConfig(settings.currencyConfig);
       setColorTheme(settings?.teacherTheme ?? "genji");
+      setClassGoal(settings?.classGoal ?? { target: null, label: null });
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load data");
@@ -189,6 +194,12 @@ export function useStore() {
     await storage.saveTeacherTheme(theme);
   }, []);
 
+  /** Shared class goal: earned progress is derived from the ledger. */
+  const saveClassGoal = useCallback(async (goal: { target: number | null; label: string | null }) => {
+    await storage.saveClassGoal(goal);
+    setClassGoal(goal);
+  }, []);
+
   // ----- Reward shop -----
 
   const addReward = useCallback(
@@ -309,6 +320,7 @@ export function useStore() {
     error,
     currencyConfig,
     colorTheme,
+    classGoal,
     addStudent,
     addStudentWithPin,
     updateStudent,
@@ -321,6 +333,7 @@ export function useStore() {
     setTransactionUndone,
     saveCurrency,
     saveColorTheme,
+    saveClassGoal,
     addReward,
     updateReward,
     deleteReward,

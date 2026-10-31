@@ -230,6 +230,7 @@ export async function getClassSettings(): Promise<{
   className: string;
   currencyConfig: CurrencyConfig;
   teacherTheme: ColorTheme;
+  classGoal: { target: number | null; label: string | null };
 } | null> {
   const { data, error } = await supabase
     .from("class_settings")
@@ -245,6 +246,10 @@ export async function getClassSettings(): Promise<{
       achievement: data.achievement_currency,
     },
     teacherTheme: isColorTheme(data.teacher_theme) ? data.teacher_theme : "genji",
+    classGoal: {
+      target: data.class_goal_target ?? null,
+      label: data.class_goal_label ?? null,
+    },
   };
 }
 
@@ -272,6 +277,34 @@ export async function saveCurrencyConfig(config: CurrencyConfig): Promise<void> 
 /** The (single) teacher's console colour theme — a personal preference. */
 export async function saveTeacherTheme(theme: ColorTheme): Promise<void> {
   const { error } = await supabase.from("class_settings").update({ teacher_theme: theme }).eq("id", 1);
+  if (error) throw error;
+}
+
+// ---------- Class goal ----------
+
+export interface ClassGoalProgress {
+  target: number | null;
+  label: string | null;
+  earned: number;
+}
+
+/** Shared class goal + class-wide earned total (secure aggregate RPC). */
+export async function getClassGoalProgress(): Promise<ClassGoalProgress> {
+  const { data, error } = await supabase.rpc("class_goal_progress");
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as { target: number | null; label: string | null; earned: number };
+  return { target: r.target ?? null, label: r.label ?? null, earned: r.earned ?? 0 };
+}
+
+/** Teacher sets (or clears) the shared class goal. */
+export async function saveClassGoal(goal: { target: number | null; label: string | null }): Promise<void> {
+  const { error } = await supabase
+    .from("class_settings")
+    .update({
+      class_goal_target: goal.target,
+      class_goal_label: goal.target === null ? null : (goal.label?.trim() || null),
+    })
+    .eq("id", 1);
   if (error) throw error;
 }
 

@@ -21,6 +21,7 @@ import { applyColorTheme, isColorTheme, type ColorTheme } from "@/lib/themes";
 import { ThemePicker } from "@/components/ThemePicker";
 import { levelProgress, levelForXp } from "@/lib/levels";
 import { Confetti } from "@/components/student/Confetti";
+import { getClassGoalProgress, type ClassGoalProgress } from "@/lib/storage";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import type { CurrencySettings, PointTransaction } from "@/types";
 
@@ -48,6 +49,7 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const [quizzesError, setQuizzesError] = useState<string | null>(null);
   const [autoStartId, setAutoStartId] = useState<string | null>(null);
   const [shopRewards, setShopRewards] = useState<GoalRewardPreset[]>([]);
+  const [classGoal, setClassGoal] = useState<ClassGoalProgress | null>(null);
   const [notes, setNotes] = useState<{ id: number; message: string }[]>([]);
   const [colorOpen, setColorOpen] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
@@ -69,6 +71,10 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         getMyQuizList().catch(() => null),
         getShopRewards().catch(() => null as RewardRow[] | null),
       ]);
+      // Class goal is a secure aggregate; hide the card if it ever fails.
+      getClassGoalProgress()
+        .then((g) => setClassGoal(g.target !== null ? g : null))
+        .catch(() => setClassGoal(null));
       const mapped = txns.map(storage.mapTransactionRow);
       if (markNew && prevIds) {
         const fresh = mapped.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
@@ -310,6 +316,10 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const dueCount = openQuizzes.length;
   const dueQuizzes = [...openQuizzes].sort((a, b) => a.dueAt - b.dueAt).slice(0, 3);
   const dueVisible = dueQuizzes.length > 0;
+
+  // Class goal rendered only with a target set (narrows the null away).
+  const classGoalView =
+    classGoal && classGoal.target !== null ? { ...classGoal, target: classGoal.target } : null;
 
   if (loading) return <StudentSkeleton />;
 
@@ -611,6 +621,79 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
                 onViewAll={() => setTab("quizzes")}
               />
             )}
+
+            {/* Class goal — the whole class working together (second on mobile) */}
+            {classGoalView && (
+              <section
+                className={`relative animate-slide-up overflow-hidden rounded-card border bg-warm-ivory p-6 shadow-soft lg:col-span-8 lg:col-start-1 lg:row-start-4 dark:bg-ink-900 ${
+                  classGoalView.earned >= classGoalView.target
+                    ? "border-deep-gold/40 dark:border-antique-gold/40"
+                    : "border-ink-200/70 dark:border-ink-800/70"
+                }`}
+              >
+                {classGoalView.earned >= classGoalView.target && <Confetti count={70} />}
+                <div className="relative z-10">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+                        Class goal
+                      </p>
+                      <h2 className="mt-0.5 truncate font-display text-2xl font-semibold text-ink-900 dark:text-warm-ivory">
+                        {classGoalView.label || "Our class goal"}
+                      </h2>
+                    </div>
+                    {classGoalView.earned >= classGoalView.target && (
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ivory-dim text-deep-gold dark:bg-antique-gold/10 dark:text-antique-gold">
+                        <PartyPopper className="h-5 w-5" aria-hidden />
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-4 flex items-baseline gap-2">
+                    <span className="flex items-center gap-1.5 font-mono text-4xl font-extrabold tabular-nums tracking-tight text-ink-900 dark:text-warm-ivory">
+                      <CurrencyIcon
+                        name={currency.icon}
+                        className={`h-7 w-7 md:h-8 md:w-8 ${iconClass}`}
+                        strokeWidth={2.25}
+                      />
+                      {classGoalView.earned}
+                    </span>
+                    <span className="text-sm font-medium text-ink-400 dark:text-ink-500">
+                      of {classGoalView.target} {classGoalView.target === 1 ? currency.singular : currency.plural} earned together
+                    </span>
+                  </p>
+                  <div
+                    className="mt-3 h-3 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={classGoalView.target}
+                    aria-valuenow={Math.min(classGoalView.earned, classGoalView.target)}
+                    aria-label="Class goal progress"
+                  >
+                    <div
+                      className="h-full rounded-full bg-antique-gold transition-all duration-700"
+                      style={{
+                        width: `${Math.min(100, Math.round((classGoalView.earned / classGoalView.target) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  {classGoalView.earned >= classGoalView.target ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-sm font-bold text-deep-gold dark:text-antique-gold">
+                      <PartyPopper className="h-4 w-4" aria-hidden />
+                      Goal reached — great work, everyone!
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
+                      <span className="font-mono font-bold tabular-nums text-ink-800 dark:text-ink-100">
+                        {classGoalView.target - classGoalView.earned}
+                      </span>{" "}
+                      more {classGoalView.target - classGoalView.earned === 1 ? currency.singular.toLowerCase() : currency.plural.toLowerCase()} to go —
+                      every award counts!
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+
 
             {/* My goal — third on mobile, bottom-left on desktop */}
             <section className="rounded-card border border-ink-200/70 bg-warm-ivory p-5 shadow-soft dark:border-ink-800/70 dark:bg-ink-900 lg:col-span-4 lg:col-start-1 lg:row-start-3">
