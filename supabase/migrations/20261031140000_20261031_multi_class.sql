@@ -67,6 +67,12 @@ ALTER TABLE public.students ALTER COLUMN class_id SET DEFAULT 1;
 ALTER TABLE public.behaviors ALTER COLUMN class_id SET DEFAULT 1;
 ALTER TABLE public.point_transactions ALTER COLUMN class_id SET DEFAULT 1;
 
+-- Backfill any rows that predate the defaults (students created between the
+-- first class_id migration and this one have class_id IS NULL).
+UPDATE public.students SET class_id = 1 WHERE class_id IS NULL;
+UPDATE public.behaviors SET class_id = 1 WHERE class_id IS NULL;
+UPDATE public.point_transactions SET class_id = 1 WHERE class_id IS NULL;
+
 -- ===== 3. RLS on classes ====================================================
 
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
