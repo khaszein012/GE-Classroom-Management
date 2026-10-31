@@ -82,12 +82,57 @@ function rowToTransaction(r: TransactionRow): PointTransaction {
   };
 }
 
+// ---------- Classes (multi-class) ----------
+
+export interface ClassInfo {
+  id: number;
+  name: string;
+  emoji: string;
+  class_goal_target: number | null;
+  class_goal_label: string | null;
+}
+
+export async function getClasses(): Promise<ClassInfo[]> {
+  const { data, error } = await supabase
+    .from("classes")
+    .select("*")
+    .order("id", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as ClassInfo[];
+}
+
+export async function createClass(name: string, emoji: string): Promise<ClassInfo> {
+  const { data, error } = await supabase
+    .from("classes")
+    .insert({ name: name.trim(), emoji })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as ClassInfo;
+}
+
+/** Teacher sets (or clears) the active class's shared goal. */
+export async function saveClassGoal(
+  classId: number,
+  goal: { target: number | null; label: string | null },
+): Promise<void> {
+  const { error } = await supabase
+    .from("classes")
+    .update({
+      class_goal_target: goal.target,
+      class_goal_label: goal.target === null ? null : (goal.label?.trim() || null),
+    })
+    .eq("id", classId);
+  if (error) throw error;
+}
+
 // ---------- Students ----------
 
-export async function getStudents(): Promise<Student[]> {
+export async function getStudents(classId: number): Promise<Student[]> {
   const { data, error } = await supabase
     .from("students")
     .select("*")
+    .eq("class_id", classId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as StudentRow[]).map(rowToStudent);
@@ -95,6 +140,7 @@ export async function getStudents(): Promise<Student[]> {
 
 export async function addStudent(input: {
   displayName: string;
+  classId: number;
   avatarColor?: number;
   username?: string | null;
   pin?: string | null;
@@ -104,6 +150,7 @@ export async function addStudent(input: {
     avatar_emoji: "",
     avatar_color: input.avatarColor ?? 0,
     username: input.username ?? null,
+    class_id: input.classId,
   };
   if (input.pin) values.pin_hash = await hashPin(input.pin);
   const { data, error } = await supabase
@@ -148,19 +195,20 @@ export async function isUsernameTaken(username: string, excludeId?: string): Pro
 
 // ---------- Behaviors ----------
 
-export async function getBehaviors(): Promise<Behavior[]> {
+export async function getBehaviors(classId: number): Promise<Behavior[]> {
   const { data, error } = await supabase
     .from("behaviors")
     .select("*")
+    .eq("class_id", classId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as BehaviorRow[]).map(rowToBehavior);
 }
 
-export async function addBehavior(label: string, emoji: string, points: number): Promise<Behavior> {
+export async function addBehavior(label: string, emoji: string, points: number, classId: number): Promise<Behavior> {
   const { data, error } = await supabase
     .from("behaviors")
-    .insert({ label: label.trim(), emoji, points })
+    .insert({ label: label.trim(), emoji, points, class_id: classId })
     .select("*")
     .single();
   if (error) throw error;
@@ -187,16 +235,18 @@ export async function deleteBehavior(id: string): Promise<void> {
 
 // ---------- Transactions ----------
 
-export async function getTransactions(): Promise<PointTransaction[]> {
+export async function getTransactions(classId: number): Promise<PointTransaction[]> {
   const { data, error } = await supabase
     .from("point_transactions")
     .select("*")
+    .eq("class_id", classId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as TransactionRow[]).map(rowToTransaction);
 }
 
 export async function addTransactions(
+  classId: number,
   inputs: {
     studentId: string;
     type: TransactionType;
@@ -211,6 +261,7 @@ export async function addTransactions(
     amount: input.amount,
     reason: input.reason,
     behavior_id: input.behaviorId ?? null,
+    class_id: classId,
   }));
   const { error } = await supabase.from("point_transactions").insert(rows);
   if (error) throw error;
@@ -288,24 +339,22 @@ export interface ClassGoalProgress {
   earned: number;
 }
 
-/** Shared class goal + class-wide earned total (secure aggregate RPC). */
-export async function getClassGoalProgress(): Promise<ClassGoalProgress> {
-  const { data, error } = await supabase.rpc("class_goal_progress");
+/** The signed-in student's class goal + class earned total (secure RPC). */
+export async function getClassGoalProgress(): Promise<ClassGoalProgress & { class_id: number }> {
+  const { data, error } = await supabase.rpc("my_class_goal");
   if (error) throw new Error(error.message);
-  const r = (data ?? {}) as { target: number | null; label: string | null; earned: number };
-  return { target: r.target ?? null, label: r.label ?? null, earned: r.earned ?? 0 };
-}
-
-/** Teacher sets (or clears) the shared class goal. */
-export async function saveClassGoal(goal: { target: number | null; label: string | null }): Promise<void> {
-  const { error } = await supabase
-    .from("class_settings")
-    .update({
-      class_goal_target: goal.target,
-      class_goal_label: goal.target === null ? null : (goal.label?.trim() || null),
-    })
-    .eq("id", 1);
-  if (error) throw error;
+  const r = (data ?? {}) as {
+    class_id: number;
+    target: number | null;
+    label: string | null;
+    earned: number;
+  };
+  return {
+    class_id: r.class_id ?? 1,
+    target: r.target ?? null,
+    label: r.label ?? null,
+    earned: r.earned ?? 0,
+  };
 }
 
 /** Achievement stats for the signed-in student (secure aggregate RPC). */
@@ -430,13 +479,18 @@ export function mapTransactionRow(r: TransactionRow): PointTransaction {
 
 // ---------- Migration helper ----------
 
-export async function insertStudentsRaw(rows: {
-  display_name: string;
-  avatar_emoji: string;
-  avatar_color: number;
-}[]): Promise<void> {
+export async function insertStudentsRaw(
+  classId: number,
+  rows: {
+    display_name: string;
+    avatar_emoji: string;
+    avatar_color: number;
+  }[],
+): Promise<void> {
   if (rows.length === 0) return;
-  const { error } = await supabase.from("students").insert(rows);
+  const { error } = await supabase
+    .from("students")
+    .insert(rows.map((r) => ({ ...r, class_id: classId })));
   if (error) throw error;
 }
 
@@ -472,10 +526,11 @@ function rowToReward(r: RewardRow): Reward {
   };
 }
 
-export async function getRewards(): Promise<Reward[]> {
+export async function getRewards(classId: number): Promise<Reward[]> {
   const { data, error } = await supabase
     .from("rewards")
     .select("*")
+    .eq("class_id", classId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -484,6 +539,7 @@ export async function getRewards(): Promise<Reward[]> {
 
 export async function addReward(input: {
   name: string;
+  classId: number;
   description?: string | null;
   cost: number;
   currency?: RewardCurrency;
@@ -494,6 +550,7 @@ export async function addReward(input: {
     name: input.name.trim(),
     description: input.description?.trim() || null,
     cost: input.cost,
+    class_id: input.classId,
     currency: input.currency ?? "dollars",
     stock: input.stock,
     image_url: input.imageUrl ?? null,
@@ -592,10 +649,11 @@ function rowToRedemption(r: RedemptionRow): Redemption {
     note: r.note,
   };
 }
-export async function getRedemptions(): Promise<Redemption[]> {
+export async function getRedemptions(classId: number): Promise<Redemption[]> {
   const { data, error } = await supabase
     .from("redemptions")
-    .select("*, rewards(name)")
+    .select("*, rewards!inner(name, class_id)")
+    .eq("rewards.class_id", classId)
     .order("requested_at", { ascending: false });
   if (error) throw error;
   return (data as RedemptionRow[]).map(rowToRedemption);
@@ -716,9 +774,9 @@ function rowToQuiz(r: QuizRow): Quiz {
   };
 }
 
-export async function getQuizzes(): Promise<QuizSummary[]> {
+export async function getQuizzes(classId: number): Promise<QuizSummary[]> {
   const [quizRes, questionRes, assignmentRes, attemptRes] = await Promise.all([
-    supabase.from("quizzes").select("*").order("due_at", { ascending: true }),
+    supabase.from("quizzes").select("*").eq("class_id", classId).order("due_at", { ascending: true }),
     supabase.from("quiz_questions").select("quiz_id"),
     supabase.from("quiz_assignments").select("quiz_id"),
     supabase.from("quiz_attempts").select("quiz_id, submitted_at"),
@@ -817,6 +875,7 @@ export async function getQuizDetail(quizId: string): Promise<QuizDetail> {
 }
 
 export async function saveQuizMeta(input: {
+  classId: number;
   id?: string;
   title: string;
   description: string | null;
@@ -828,6 +887,7 @@ export async function saveQuizMeta(input: {
     description: input.description?.trim() || null,
     max_gems: input.maxGems,
     due_at: new Date(input.dueAt).toISOString(),
+    class_id: input.classId,
   };
   if (input.id) {
     const { error } = await supabase.from("quizzes").update(values).eq("id", input.id);

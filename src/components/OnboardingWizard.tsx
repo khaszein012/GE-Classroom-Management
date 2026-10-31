@@ -61,14 +61,14 @@ export function OnboardingWizard({
     setAdding(true);
     setError(null);
     try {
-      await storage.insertStudentsRaw(
+      await storage.insertStudentsRaw(store.activeClassId, 
         parsed.map((name, i) => ({
           display_name: name.slice(0, 60),
           avatar_emoji: "",
           avatar_color: i % AVATAR_PALETTE.length,
         })),
       );
-      await store.refresh();
+      await store.refresh(store.activeClassId);
       setStep(2);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add the students.");

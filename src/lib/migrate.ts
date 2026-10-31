@@ -109,7 +109,7 @@ export async function migrateLegacyData(): Promise<string | null> {
     // Map old behavior ids to new ones so transactions can re-link.
     const behaviorIdMap = new Map<string, string>();
     for (const b of behaviors) {
-      const created = await addBehavior(b.label, b.emoji, b.points);
+      const created = await addBehavior(b.label, b.emoji, b.points, 1);
       behaviorIdMap.set(b.id, created.id);
     }
     if (behaviors.length > 0) parts.push(`${behaviors.length} behaviors`);
@@ -119,6 +119,7 @@ export async function migrateLegacyData(): Promise<string | null> {
       const s = students[i];
       const username = await uniqueUsername(s.displayName);
       const created = await addStudent({
+        classId: 1,
         displayName: s.displayName,
         avatarColor: nextColorIndex(i),
         username,

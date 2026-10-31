@@ -116,6 +116,10 @@ function MainApp({
         onSignOut={() => void signOut()}
         pendingCount={pendingCount}
         onOpenHelp={() => setHelpOpen(true)}
+        classes={store.classes}
+        activeClassId={store.activeClassId}
+        onSwitchClass={store.switchClass}
+        onCreateClass={(name, emoji) => void store.createClass(name, emoji)}
       />
       {/* On desktop the sidebar is fixed 256px wide — shift content right by exactly that amount */}
       <main className="min-w-0 flex-1 overflow-hidden lg:ml-64">
@@ -123,7 +127,7 @@ function MainApp({
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-sm font-medium text-warm-brick">{store.error}</p>
             <button
-              onClick={() => void store.refresh()}
+              onClick={() => void store.refresh(store.activeClassId)}
               className="rounded-button bg-obsidian dark:bg-antique-gold dark:text-obsidian px-4 py-2 text-sm font-semibold text-warm-ivory hover:bg-ink-700 dark:hover:bg-deep-gold"
             >
               Try again
@@ -198,7 +202,7 @@ function Authenticated({
     migrateLegacyData().then((result) => {
       if (result) {
         toast.show(result, "info");
-        void store.refresh();
+        void store.refresh(store.activeClassId);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

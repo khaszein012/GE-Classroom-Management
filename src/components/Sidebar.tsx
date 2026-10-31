@@ -13,6 +13,10 @@ interface Props {
   onSignOut?: () => void;
   pendingCount?: number;
   onOpenHelp?: () => void;
+  classes: { id: number; name: string; emoji: string }[];
+  activeClassId: number;
+  onSwitchClass: (id: number) => void;
+  onCreateClass: (name: string, emoji: string) => void;
 }
 
 interface NavItemsProps {
@@ -32,7 +36,7 @@ const NAV: { id: Screen; label: string; icon: typeof Home }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSignOut, pendingCount = 0, onOpenHelp }: Props) {
+export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSignOut, pendingCount = 0, onOpenHelp, classes, activeClassId, onSwitchClass, onCreateClass }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleNav = (s: Screen) => {
@@ -77,6 +81,13 @@ export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSi
                 <X className="h-5 w-5" />
               </button>
             </div>
+            <ClassSwitcher
+              classes={classes}
+              activeClassId={activeClassId}
+              onSwitchClass={onSwitchClass}
+              onCreateClass={onCreateClass}
+            />
+            <div className="my-2 border-t border-ink-200/70 dark:border-ink-800/70" />
             <NavItems current={current} onNavigate={handleNav} pendingCount={pendingCount} />
             <Footer theme={theme} onToggleTheme={onToggleTheme} email={email} onSignOut={onSignOut} onOpenHelp={openHelp} />
           </div>
@@ -89,6 +100,13 @@ export function Sidebar({ current, onNavigate, theme, onToggleTheme, email, onSi
           <Brand />
         </div>
         <div className="flex-1 overflow-y-auto px-3">
+          <ClassSwitcher
+            classes={classes}
+            activeClassId={activeClassId}
+            onSwitchClass={onSwitchClass}
+            onCreateClass={onCreateClass}
+          />
+          <div className="my-2 border-t border-ink-200/70 dark:border-ink-800/70" />
           <NavItems current={current} onNavigate={handleNav} pendingCount={pendingCount} />
         </div>
         <div className="px-3 pb-4">
@@ -197,6 +215,116 @@ function Footer({
         >
           <LogOut className="h-[18px] w-[18px]" />
           Sign out
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ClassSwitcher({
+  classes,
+  activeClassId,
+  onSwitchClass,
+  onCreateClass,
+}: {
+  classes: { id: number; name: string; emoji: string }[];
+  activeClassId: number;
+  onSwitchClass: (id: number) => void;
+  onCreateClass: (name: string, emoji: string) => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [emoji, setEmoji] = useState("🎓");
+  const EMOJIS = ["🎓", "📚", "🎨", "🧪", "🎵", "⚽", "🌟", "🚀", "🧩", "🍎"];
+
+  const create = () => {
+    if (!name.trim()) return;
+    onCreateClass(name.trim(), emoji);
+    setName("");
+    setEmoji("🎓");
+    setCreating(false);
+  };
+
+  return (
+    <div className="px-2">
+      <p className="px-1 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+        All classes
+      </p>
+      <div className="max-h-44 space-y-0.5 overflow-y-auto">
+        {classes.map((c) => {
+          const active = c.id === activeClassId;
+          return (
+            <button
+              key={c.id}
+              onClick={() => onSwitchClass(c.id)}
+              aria-pressed={active}
+              className={`flex min-h-10 w-full items-center gap-2 rounded-button px-2 py-1.5 text-left text-sm transition-colors ${
+                active
+                  ? "bg-ivory-dim font-semibold text-deep-gold dark:bg-antique-gold/10 dark:text-antique-gold"
+                  : "text-ink-600 hover:bg-ink-100 dark:text-ink-300 dark:hover:bg-ink-800"
+              }`}
+            >
+              <span className="text-base" aria-hidden>{c.emoji}</span>
+              <span className="min-w-0 flex-1 truncate">{c.name}</span>
+              {active && (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-antique-gold" aria-hidden />
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {creating ? (
+        <div className="mt-1 rounded-button border border-ink-200 p-2 dark:border-ink-700">
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && create()}
+            placeholder="Class name…"
+            maxLength={60}
+            className="h-9 w-full rounded-button border border-ink-200 bg-warm-ivory px-2 text-sm outline-none focus:border-antique-gold dark:border-ink-700 dark:bg-ink-800"
+            aria-label="New class name"
+          />
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {EMOJIS.map((e) => (
+              <button
+                key={e}
+                onClick={() => setEmoji(e)}
+                aria-pressed={emoji === e}
+                aria-label={`Icon ${e}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-button text-base transition-colors ${
+                  emoji === e ? "bg-ivory-dim ring-1 ring-antique-gold dark:bg-ink-800" : "hover:bg-ink-100 dark:hover:bg-ink-800"
+                }`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex justify-end gap-1.5">
+            <button
+              onClick={() => setCreating(false)}
+              className="min-h-9 rounded-button px-2 text-xs font-semibold text-ink-500 hover:bg-ink-100 dark:text-ink-400 dark:hover:bg-ink-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={create}
+              disabled={!name.trim()}
+              className="min-h-9 rounded-button bg-obsidian px-3 text-xs font-bold text-warm-ivory disabled:opacity-50 dark:bg-antique-gold dark:text-obsidian"
+            >
+              Create
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setCreating(true)}
+          className="mt-1 flex min-h-9 w-full items-center gap-2 rounded-button px-2 text-xs font-semibold text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-button border border-dashed border-ink-300 text-sm leading-none dark:border-ink-600" aria-hidden>
+            +
+          </span>
+          New class
         </button>
       )}
     </div>

@@ -27,6 +27,11 @@ export function useStore() {
   const [quizzesError, setQuizzesError] = useState<string | null>(null);
   const [currencyConfig, setCurrencyConfig] = useState<CurrencyConfig>(DEFAULT_CURRENCY_CONFIG);
   const [colorTheme, setColorTheme] = useState<ColorTheme>("genji");
+  const [classes, setClasses] = useState<storage.ClassInfo[]>([]);
+  const [activeClassId, setActiveClassId] = useState<number>(() => {
+    const stored = Number(localStorage.getItem("cr_active_class"));
+    return Number.isFinite(stored) && stored > 0 ? stored : 1;
+  });
   const [classGoal, setClassGoal] = useState<{ target: number | null; label: string | null }>({
     target: null,
     label: null,
@@ -47,16 +52,23 @@ export function useStore() {
     setLifetime(lifetimeMap);
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(
+    async (activeClassId: number) => {
     try {
       const [s, b, t, settings, r, rd] = await Promise.all([
-        storage.getStudents(),
-        storage.getBehaviors(),
-        storage.getTransactions(),
+        storage.getStudents(activeClassId),
+        storage.getBehaviors(activeClassId),
+        storage.getTransactions(activeClassId),
         storage.getClassSettings(),
-        storage.getRewards(),
-        storage.getRedemptions(),
+        storage.getRewards(activeClassId),
+        storage.getRedemptions(activeClassId),
       ]);
+      // Classes load fail-soft: before the multi-class migration the table
+      // doesn't exist and the console keeps working on the default class.
+      storage
+        .getClasses()
+        .then(setClasses)
+        .catch(() => setClasses([]));
       setStudents(s);
       setBehaviors(b);
       setTransactions(t);
@@ -65,30 +77,49 @@ export function useStore() {
       setRedemptions(rd);
       if (settings) setCurrencyConfig(settings.currencyConfig);
       setColorTheme(settings?.teacherTheme ?? "genji");
-      setClassGoal(settings?.classGoal ?? { target: null, label: null });
+      const active = classes.find((c) => c.id === activeClassId);
+      setClassGoal({
+        target: active?.class_goal_target ?? null,
+        label: active?.class_goal_label ?? null,
+      });
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
-  }, [applyDerived]);
+    },
+    [applyDerived],
+  );
+
+  /** Switch the active class: persisted + everything reloads scoped. */
+  const switchClass = useCallback((classId: number) => {
+    setActiveClassId(classId);
+    setQuizzesError(null);
+    setError(null);
+    try {
+      localStorage.setItem("cr_active_class", String(classId));
+    } catch {
+      /* ignore */
+    }
+    setLoading(true);
+  }, []);
 
   // Quizzes load independently so a quiz-table problem can never take down
   // the awarding/shop screens (and vice versa).
   const refreshQuizzes = useCallback(async () => {
     try {
-      setQuizzes(await storage.getQuizzes());
+      setQuizzes(await storage.getQuizzes(activeClassId));
       setQuizzesError(null);
     } catch (e) {
       setQuizzesError(e instanceof Error ? e.message : "Failed to load quizzes");
     }
-  }, []);
+  }, [activeClassId]);
 
   useEffect(() => {
-    void refresh();
+    void refresh(activeClassId);
     void refreshQuizzes();
-  }, [refresh, refreshQuizzes]);
+  }, [refresh, refreshQuizzes, activeClassId]);
 
   const run = useCallback(
     async (fn: () => Promise<void>) => {
@@ -99,10 +130,10 @@ export function useStore() {
         setError(e instanceof Error ? e.message : "Operation failed");
         throw e;
       } finally {
-        await refresh();
+        await refresh(activeClassId);
       }
     },
-    [refresh],
+    [refresh, activeClassId],
   );
 
   const addStudent = useCallback(
@@ -111,9 +142,10 @@ export function useStore() {
         await storage.addStudent({
           displayName,
           avatarColor,
+          classId: activeClassId,
         });
       }),
-    [run],
+    [run, activeClassId],
   );
 
   const addStudentWithPin = useCallback(
@@ -124,9 +156,10 @@ export function useStore() {
           avatarColor: input.avatarColor,
           username: input.username,
           pin: input.pin,
+          classId: activeClassId,
         });
       }).then(() => undefined),
-    [run],
+    [run, activeClassId],
   );
 
   const updateStudent = useCallback(
@@ -147,8 +180,8 @@ export function useStore() {
 
   const addBehavior = useCallback(
     (label: string, emoji: string, points: number) =>
-      run(() => storage.addBehavior(label, emoji, points).then(() => undefined)),
-    [run],
+      run(() => storage.addBehavior(label, emoji, points, activeClassId).then(() => undefined)),
+    [run, activeClassId],
   );
 
   const updateBehavior = useCallback(
@@ -168,9 +201,12 @@ export function useStore() {
       input: { type: TransactionType; amount: number; reason: string; behaviorId?: string },
     ) =>
       run(async () => {
-        await storage.addTransactions(studentIds.map((studentId) => ({ studentId, ...input })));
+        await storage.addTransactions(
+          activeClassId,
+          studentIds.map((studentId) => ({ studentId, ...input })),
+        );
       }),
-    [run],
+    [run, activeClassId],
   );
 
   const setTransactionUndone = useCallback(
@@ -194,18 +230,21 @@ export function useStore() {
     await storage.saveTeacherTheme(theme);
   }, []);
 
-  /** Shared class goal: earned progress is derived from the ledger. */
-  const saveClassGoal = useCallback(async (goal: { target: number | null; label: string | null }) => {
-    await storage.saveClassGoal(goal);
-    setClassGoal(goal);
-  }, []);
+  /** Shared class goal for the ACTIVE class. */
+  const saveClassGoal = useCallback(
+    async (goal: { target: number | null; label: string | null }) => {
+      await storage.saveClassGoal(activeClassId, goal);
+      setClassGoal(goal);
+    },
+    [activeClassId],
+  );
 
   // ----- Reward shop -----
 
   const addReward = useCallback(
     (input: { name: string; description?: string | null; cost: number; currency?: RewardCurrency; stock: number | null; imageUrl?: string | null }) =>
-      run(() => storage.addReward(input)).then(() => undefined),
-    [run],
+      run(() => storage.addReward({ ...input, classId: activeClassId })).then(() => undefined),
+    [run, activeClassId],
   );
 
   const updateReward = useCallback(
@@ -258,6 +297,7 @@ export function useStore() {
     }) =>
       (async () => {
         const quizId = await storage.saveQuizMeta({
+          classId: activeClassId,
           id: input.id,
           title: input.title,
           description: input.description,
@@ -303,10 +343,25 @@ export function useStore() {
       await storage.reopenQuiz(id, dueAt);
       await refreshQuizzes();
     },
-    [refreshQuizzes],
+    [refreshQuizzes, activeClassId],
+  );
+
+  /** Create a class and switch to it immediately. */
+  const createClass = useCallback(
+    async (name: string, emoji: string) => {
+      const created = await storage.createClass(name, emoji);
+      setClasses((prev) => [...prev, created]);
+      switchClass(created.id);
+      return created;
+    },
+    [switchClass],
   );
 
   return {
+    classes,
+    activeClassId,
+    switchClass,
+    createClass,
     students,
     behaviors,
     transactions,
