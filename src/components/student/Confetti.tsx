@@ -33,13 +33,17 @@ export function Confetti({ count = 90 }: { count?: number }) {
       {pieces.map((p, i) => (
         <span
           key={i}
-          className={`absolute top-0 block ${p.color} ${p.round ? "rounded-full" : "rounded-[1px]"}`}
+          className={`absolute top-0 block animate-confetti-fall ${p.color} ${p.round ? "rounded-full" : "rounded-[1px]"}`}
           style={
             {
               left: `${p.left}%`,
               width: p.size,
               height: p.round ? p.size : p.size * 0.55,
-              animation: `confetti-fall ${p.duration}s linear ${p.delay}s forwards`,
+              // Per-piece overrides on top of the animate-confetti-fall
+              // shorthand (that class is what makes Tailwind emit the
+              // keyframes at all — an inline `animation:` never would).
+              animationDuration: `${p.duration}s`,
+              animationDelay: `${p.delay}s`,
               "--rot": p.rot,
             } as React.CSSProperties
           }

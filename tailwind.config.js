@@ -96,6 +96,10 @@ export default {
         'toast-pop': 'toast-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         'rule-in': 'rule-in 800ms cubic-bezier(0.22, 1, 0.36, 1) 0.2s both',
         'medal-pop': 'medal-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        // Emitted only when animate-confetti-fall is used — Confetti.tsx uses
+        // the class and overrides duration/delay per piece inline. `both`
+        // keeps delayed pieces hidden above the screen until their turn.
+        'confetti-fall': 'confetti-fall 2.4s linear both',
       },
     },
   },
