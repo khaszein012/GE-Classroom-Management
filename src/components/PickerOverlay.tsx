@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Dices, RotateCcw, X } from "lucide-react";
+import { Check, Dices, RotateCcw, Users, X } from "lucide-react";
 import { Monogram } from "@/components/Monogram";
 import { Confetti } from "@/components/student/Confetti";
 
 /**
  * Random student picker — slot-machine style name roller for the projector.
- * Fair mode: everyone gets a turn before anyone repeats (picked list kept
- * locally, reset anytime). One giant name flickers and decelerates onto the
- * winner — tidy at any class size, big enough to read from the back row.
+ * Pool: by default everyone; the teacher can narrow it to a hand-picked
+ * subset (kept per class in localStorage). Fair mode: everyone in the pool
+ * gets a turn before anyone repeats. One giant name flickers and
+ * decelerates onto the winner — tidy at any class size.
  */
 
 const FAIR_KEY = "cr_picker_picked";
 const FAIR_MODE_KEY = "cr_picker_fair";
+const poolKey = (classId: number) => `cr_picker_pool_${classId}`;
 
 interface PickerStudent {
   id: string;
@@ -27,15 +29,40 @@ function loadPicked(): string[] {
   }
 }
 
-export function PickerOverlay({ students, onClose }: { students: PickerStudent[]; onClose: () => void }) {
+/** Saved pool for this class, minus ids that no longer exist; none saved → everyone. */
+function loadPool(classId: number, students: PickerStudent[]): string[] | null {
+  try {
+    const raw = localStorage.getItem(poolKey(classId));
+    if (!raw) return null;
+    const saved: string[] = JSON.parse(raw);
+    const ids = new Set(students.map((s) => s.id));
+    const valid = saved.filter((id) => ids.has(id));
+    return valid.length > 0 ? valid : null; // empty/stale save self-heals to everyone
+  } catch {
+    return null;
+  }
+}
+
+export function PickerOverlay({
+  students,
+  classId,
+  onClose,
+}: {
+  students: PickerStudent[];
+  classId: number;
+  onClose: () => void;
+}) {
   const [fairMode, setFairMode] = useState(() => localStorage.getItem(FAIR_MODE_KEY) !== "0");
   const [pickedIds, setPickedIds] = useState<string[]>(loadPicked);
+  const [poolIds, setPoolIds] = useState<string[] | null>(() => loadPool(classId, students));
+  const [choosing, setChoosing] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [display, setDisplay] = useState<PickerStudent | null>(students[0] ?? null);
   const [landed, setLanded] = useState<PickerStudent | null>(null);
   const timerRef = useRef<number | null>(null);
 
-  const active = students.filter((s) => !fairMode || !pickedIds.includes(s.id));
+  const pool = poolIds === null ? students : students.filter((s) => poolIds.includes(s.id));
+  const active = pool.filter((s) => !fairMode || !pickedIds.includes(s.id));
 
   useEffect(
     () => () => {
@@ -43,6 +70,23 @@ export function PickerOverlay({ students, onClose }: { students: PickerStudent[]
     },
     [],
   );
+
+  const savePool = (next: string[] | null) => {
+    setPoolIds(next);
+    try {
+      if (next === null) localStorage.removeItem(poolKey(classId));
+      else localStorage.setItem(poolKey(classId), JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const toggleInPool = (id: string) => {
+    const base = poolIds ?? students.map((s) => s.id);
+    const next = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+    // Deselecting everything = back to "everyone" (never a dead-end pool).
+    savePool(next.length === 0 ? null : next);
+  };
 
   const roll = () => {
     if (rolling || active.length === 0) return;
@@ -95,6 +139,97 @@ export function PickerOverlay({ students, onClose }: { students: PickerStudent[]
     }
   };
 
+  // ----- Choose-pool panel -------------------------------------------------
+  if (choosing) {
+    const selected = new Set(poolIds ?? students.map((s) => s.id));
+    return (
+      <div
+        className="fixed inset-0 z-[65] flex flex-col overflow-hidden bg-ink-950/95 px-4 py-5"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose who can be picked"
+      >
+        <div className="mx-auto flex w-full max-w-3xl shrink-0 items-center justify-between gap-3">
+          <h1 className="flex items-center gap-2 font-display text-2xl font-semibold text-warm-ivory">
+            <Users className="h-6 w-6 text-antique-gold" aria-hidden />
+            Who can be picked?
+          </h1>
+          <button
+            onClick={() => setChoosing(false)}
+            aria-label="Back to the picker"
+            className="flex h-11 w-11 items-center justify-center rounded-button text-ink-300 transition-colors hover:bg-white/10 hover:text-warm-ivory"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mx-auto mt-1 w-full max-w-3xl text-sm text-ink-400">
+          Tap to include or exclude — the roller only picks highlighted students. Your selection is
+          remembered for this class.
+        </p>
+
+        <div className="mx-auto mt-3 flex w-full max-w-3xl shrink-0 items-center justify-between gap-2">
+          <span className="font-mono text-sm font-bold tabular-nums text-antique-gold">
+            {selected.size} of {students.length} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => savePool(null)}
+              disabled={poolIds === null}
+              className="min-h-11 rounded-button border border-white/15 px-3 text-xs font-semibold text-ink-300 transition-colors hover:bg-white/5 hover:text-warm-ivory disabled:opacity-40"
+            >
+              Everyone
+            </button>
+            <button
+              onClick={() => savePool([])}
+              disabled={poolIds !== null && poolIds.length === 0}
+              className="min-h-11 rounded-button border border-white/15 px-3 text-xs font-semibold text-ink-300 transition-colors hover:bg-white/5 hover:text-warm-ivory disabled:opacity-40"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-3 w-full max-w-3xl flex-1 overflow-y-auto pb-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+            {students.map((s) => {
+              const on = selected.has(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => toggleInPool(s.id)}
+                  aria-pressed={on}
+                  className={`flex min-h-14 items-center gap-2.5 rounded-card border px-3 text-left transition-colors ${
+                    on
+                      ? "border-antique-gold/60 bg-antique-gold/10 text-warm-ivory"
+                      : "border-white/10 bg-white/[0.03] text-ink-400 hover:bg-white/5"
+                  }`}
+                >
+                  <Monogram name={s.displayName} colorIndex={s.avatarColor} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.displayName}</span>
+                  {on && <Check className="h-4 w-4 shrink-0 text-antique-gold" aria-hidden />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mx-auto flex w-full max-w-3xl shrink-0 justify-center pt-2">
+          <button
+            onClick={() => setChoosing(false)}
+            disabled={selected.size === 0}
+            className="flex min-h-14 items-center gap-2 rounded-button bg-antique-gold px-10 text-base font-bold text-obsidian transition-colors hover:bg-deep-gold hover:text-warm-ivory disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Dices className="h-5 w-5" aria-hidden />
+            {selected.size === 0
+              ? "Select at least one student"
+              : `Pick from ${selected.size} student${selected.size === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ----- Roller ------------------------------------------------------------
   return (
     <div
       className="fixed inset-0 z-[65] flex flex-col items-center overflow-hidden bg-ink-950/95 px-4 py-5"
@@ -117,7 +252,7 @@ export function PickerOverlay({ students, onClose }: { students: PickerStudent[]
         </button>
       </div>
 
-      {/* Fair mode bar */}
+      {/* Fair mode + pool bar */}
       <div className="flex w-full max-w-4xl shrink-0 flex-wrap items-center justify-center gap-3 py-3">
         <button
           onClick={toggleFair}
@@ -139,10 +274,25 @@ export function PickerOverlay({ students, onClose }: { students: PickerStudent[]
           </span>
           Fair mode
         </button>
+        <button
+          onClick={() => setChoosing(true)}
+          disabled={rolling}
+          aria-label="Choose which students can be picked"
+          className={`flex min-h-11 items-center gap-2 rounded-button border px-3 text-xs font-semibold transition-colors ${
+            poolIds === null
+              ? "border-white/15 text-ink-300 hover:bg-white/5"
+              : "border-antique-gold/50 bg-antique-gold/10 text-antique-gold"
+          } disabled:opacity-40`}
+        >
+          <Users className="h-3.5 w-3.5" aria-hidden />
+          {poolIds === null
+            ? `All ${students.length} students`
+            : `${poolIds.length} of ${students.length} students`}
+        </button>
         {fairMode && (
           <>
             <span className="font-mono text-xs tabular-nums text-ink-300">
-              {active.length} of {students.length} remaining
+              {active.length} of {pool.length} remaining
             </span>
             <button
               onClick={resetPicked}
@@ -206,15 +356,19 @@ export function PickerOverlay({ students, onClose }: { students: PickerStudent[]
           <button
             onClick={roll}
             disabled={rolling || active.length === 0}
-            className={`flex min-h-14 items-center gap-2 rounded-button px-10 text-base font-bold transition-colors ${
-              landed
-                ? "bg-antique-gold text-obsidian hover:bg-deep-gold hover:text-warm-ivory"
-                : "bg-antique-gold text-obsidian hover:bg-deep-gold hover:text-warm-ivory"
-            } disabled:cursor-wait disabled:opacity-60`}
+            className="flex min-h-14 items-center gap-2 rounded-button bg-antique-gold px-10 text-base font-bold text-obsidian transition-colors hover:bg-deep-gold hover:text-warm-ivory disabled:cursor-wait disabled:opacity-60"
             aria-label={rolling ? "Picking" : landed ? "Pick again" : "Pick a student"}
           >
             <Dices className="h-5 w-5" aria-hidden />
-            {rolling ? "Picking…" : landed ? "Roll again" : active.length === 0 ? "Everyone's had a turn" : "Pick a student"}
+            {rolling
+              ? "Picking…"
+              : landed
+                ? "Roll again"
+                : active.length === 0
+                  ? fairMode
+                    ? "Everyone's had a turn"
+                    : "No students selected"
+                  : "Pick a student"}
           </button>
           {fairMode && pickedIds.length > 0 && (
             <button

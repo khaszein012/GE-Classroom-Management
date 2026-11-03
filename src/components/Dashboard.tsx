@@ -371,6 +371,7 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
           students={students
             .filter((s) => s.isActive)
             .map((s) => ({ id: s.id, displayName: s.displayName, avatarColor: s.avatarColor }))}
+          classId={store.activeClassId}
           onClose={() => setPickerOpen(false)}
         />
       )}
