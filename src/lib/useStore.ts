@@ -32,10 +32,6 @@ export function useStore() {
     const stored = Number(localStorage.getItem("cr_active_class"));
     return Number.isFinite(stored) && stored > 0 ? stored : 1;
   });
-  const [classGoal, setClassGoal] = useState<{ target: number | null; label: string | null }>({
-    target: null,
-    label: null,
-  });
 
   const applyDerived = useCallback((txns: PointTransaction[]) => {
     const totalsMap: Record<string, number> = {};
@@ -77,11 +73,6 @@ export function useStore() {
       setRedemptions(rd);
       if (settings) setCurrencyConfig(settings.currencyConfig);
       setColorTheme(settings?.teacherTheme ?? "genji");
-      const active = classes.find((c) => c.id === activeClassId);
-      setClassGoal({
-        target: active?.class_goal_target ?? null,
-        label: active?.class_goal_label ?? null,
-      });
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load data");
@@ -115,6 +106,14 @@ export function useStore() {
       setQuizzesError(e instanceof Error ? e.message : "Failed to load quizzes");
     }
   }, [activeClassId]);
+
+  // Class goal is derived from the classes list so it can never go stale —
+  // it updates the moment classes load, switch, or get saved.
+  const activeClass = classes.find((c) => c.id === activeClassId);
+  const classGoal: { target: number | null; label: string | null } = {
+    target: activeClass?.class_goal_target ?? null,
+    label: activeClass?.class_goal_label ?? null,
+  };
 
   useEffect(() => {
     void refresh(activeClassId);
@@ -234,7 +233,14 @@ export function useStore() {
   const saveClassGoal = useCallback(
     async (goal: { target: number | null; label: string | null }) => {
       await storage.saveClassGoal(activeClassId, goal);
-      setClassGoal(goal);
+      // Optimistic update so the dashboard strip reflects it immediately.
+      setClasses((cs) =>
+        cs.map((c) =>
+          c.id === activeClassId
+            ? { ...c, class_goal_target: goal.target, class_goal_label: goal.target === null ? null : (goal.label?.trim() || null) }
+            : c,
+        ),
+      );
     },
     [activeClassId],
   );
