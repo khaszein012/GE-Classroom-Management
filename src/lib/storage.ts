@@ -18,6 +18,7 @@ interface StudentRow {
   display_name: string;
   avatar_emoji: string;
   avatar_color: number;
+  equipped_avatar?: string | null;
   username: string | null;
   pin_hash: string | null;
   is_active: boolean;
@@ -51,6 +52,7 @@ function rowToStudent(r: StudentRow): Student {
     displayName: r.display_name,
     avatarEmoji: r.avatar_emoji,
     avatarColor: r.avatar_color,
+    equippedAvatar: r.equipped_avatar ?? null,
     username: r.username,
     hasPin: r.pin_hash !== null,
     isActive: r.is_active,
@@ -425,6 +427,8 @@ export interface StudentSafeRow {
   display_name: string;
   avatar_emoji: string;
   avatar_color: number;
+  /** Premium avatar id (null/absent before the avatars migration). */
+  equipped_avatar?: string | null;
   behavior_currency: { singular: string; plural: string; icon: string; color: string } | null;
   achievement_currency?: { singular: string; plural: string; icon: string; color: string } | null;
   balance: number;
@@ -507,6 +511,43 @@ export async function saveMyTheme(theme: ColorTheme): Promise<void> {
 /** Map a raw transaction row (as returned by getMyTransactions) to the app model. */
 export function mapTransactionRow(r: TransactionRow): PointTransaction {
   return rowToTransaction(r);
+}
+
+// ---------- Premium avatars (student wardrobe) ----------
+
+/**
+ * The signed-in student's wardrobe: which avatar ids they own, and which is
+ * equipped. Reads `student_avatars` (own rows only, via RLS) plus the
+ * equipped id from students_safe.
+ *
+ * Both are optional reads: before the premium-avatars migration the table
+ * does not exist, so this fails soft and the app keeps the colour palette.
+ */
+export async function getMyAvatars(): Promise<{ owned: string[]; equipped: string }> {
+  const [ownedRes, meRes] = await Promise.all([
+    supabase.from("student_avatars").select("avatar_id"),
+    supabase.from("students_safe").select("equipped_avatar").maybeSingle(),
+  ]);
+  if (ownedRes.error) throw new Error(ownedRes.error.message);
+  if (meRes.error) throw new Error(meRes.error.message);
+  const owned = ((ownedRes.data ?? []) as { avatar_id: string }[]).map((r) => r.avatar_id);
+  const equipped =
+    ((meRes.data ?? null) as { equipped_avatar?: string } | null)?.equipped_avatar ?? "monogram";
+  return { owned, equipped };
+}
+
+/** Buy a catalog avatar with gems. Price and balance are validated server-side. */
+export async function buyAvatar(avatarId: string): Promise<{ gems_remaining: number }> {
+  const { data, error } = await supabase.rpc("buy_avatar", { p_avatar_id: avatarId });
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as { gems_remaining?: number };
+  return { gems_remaining: r.gems_remaining ?? 0 };
+}
+
+/** Equip an owned avatar (ownership is enforced inside the RPC). */
+export async function equipAvatar(avatarId: string): Promise<void> {
+  const { error } = await supabase.rpc("equip_avatar", { p_avatar_id: avatarId });
+  if (error) throw new Error(error.message);
 }
 
 // ---------- Migration helper ----------

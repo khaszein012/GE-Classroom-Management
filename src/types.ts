@@ -5,6 +5,8 @@ export interface Student {
   displayName: string;
   avatarEmoji: string;
   avatarColor: number;
+  /** Premium avatar style id (null = the classic colour monogram). */
+  equippedAvatar: string | null;
   username: string | null;
   hasPin: boolean;
   isActive: boolean;

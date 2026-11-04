@@ -167,6 +167,17 @@
   100% { box-shadow: 0 0 0 0 rgb(var(--c-antique-gold) / 0); }
 }
 @keyframes rowSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Premium avatar flourish: a faint diagonal gold sheen over the tile.
+   Pure CSS (no image assets) so avatars stay mod-safe and print-friendly. */
+.avatar-foil {
+  background-image: linear-gradient(
+    115deg,
+    transparent 0 42%,
+    rgb(255 235 180 / 0.18) 50%,
+    transparent 58% 100%
+  );
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 * { scrollbar-width: thin; scrollbar-color: rgb(var(--c-ink-300)) transparent; }
 .dark * { scrollbar-color: rgb(var(--c-ink-600)) transparent; }

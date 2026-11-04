@@ -6,6 +6,8 @@ import { levelProgress } from "@/lib/levels";
 
 interface Props {
   colorIndex: number;
+  /** Premium avatar id; null/absent keeps the classic colour monogram. */
+  avatarId?: string | null;
   name: string;
   total: number;
   lifetime: number;
@@ -18,6 +20,7 @@ interface Props {
 
 export function StudentCard({
   colorIndex,
+  avatarId,
   name,
   total,
   lifetime,
@@ -49,7 +52,7 @@ export function StudentCard({
     >
       {/* Avatar + level badge */}
       <div className="relative shrink-0">
-        <Monogram name={name} colorIndex={colorIndex} size="lg" />
+        <Monogram name={name} colorIndex={colorIndex} avatarId={avatarId} size="lg" />
         <span
           className="pointer-events-none absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-obsidian px-1 font-mono text-[9px] font-bold tabular-nums text-warm-ivory ring-2 ring-warm-ivory dark:bg-antique-gold dark:text-obsidian dark:ring-ink-900"
           aria-label={`Level ${level.level}`}

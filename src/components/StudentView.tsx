@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LogOut, Palette, PartyPopper, X } from "lucide-react";
+import { LogOut, PartyPopper, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as storage from "@/lib/storage";
 import type { StudentSafeRow } from "@/lib/storage";
 import { useCountUp } from "@/lib/useCountUp";
 import { Monogram } from "@/components/Monogram";
-import { AVATAR_PALETTE, initialsOf } from "@/lib/avatarColor";
+import { AvatarWardrobe } from "@/components/student/AvatarWardrobe";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { Skeleton } from "@/components/Skeleton";
 import { buildActivityGroups, buildTrend } from "@/components/student/activity";
@@ -56,6 +56,8 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const [notes, setNotes] = useState<{ id: number; message: string }[]>([]);
   const [colorOpen, setColorOpen] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
+  const [ownedAvatars, setOwnedAvatars] = useState<string[]>(["monogram"]);
+  const [savingAvatar, setSavingAvatar] = useState(false);
   const newIdsRef = useRef<Set<string>>(new Set());
 
   const quietNote = useCallback((message: string) => {
@@ -82,6 +84,12 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         .then(buildAchievementStats)
         .then(setAchvStats)
         .catch(() => setAchvStats(null));
+      // Wardrobe is additive: before the avatars migration this table is
+      // absent, so the colour palette keeps working on its own.
+      storage
+        .getMyAvatars()
+        .then(({ owned }) => setOwnedAvatars(owned))
+        .catch(() => setOwnedAvatars(["monogram"]));
       const mapped = txns.map(storage.mapTransactionRow);
       if (markNew && prevIds) {
         const fresh = mapped.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
@@ -301,11 +309,27 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
       try {
         await storage.updateMyAvatarColor(color);
         setRow((prev) => (prev ? { ...prev, avatar_color: color } : prev));
-        setColorOpen(false);
       } catch {
         quietNote("Could not change colour. Try again.");
       } finally {
         setSavingColor(false);
+      }
+    },
+    [quietNote],
+  );
+
+  /** Equip an owned avatar (ownership is re-checked server-side). */
+  const equipAvatar = useCallback(
+    async (avatarId: string) => {
+      setSavingAvatar(true);
+      try {
+        await storage.equipAvatar(avatarId);
+        setRow((prev) => (prev ? { ...prev, equipped_avatar: avatarId } : prev));
+        quietNote("Avatar updated.");
+      } catch (e) {
+        quietNote(e instanceof Error ? e.message : "Could not equip that avatar.");
+      } finally {
+        setSavingAvatar(false);
       }
     },
     [quietNote],
@@ -409,16 +433,38 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         ))}
       </div>
 
+      <AvatarWardrobe
+        open={colorOpen}
+        name={row.display_name}
+        colorIndex={row.avatar_color}
+        equippedId={row.equipped_avatar ?? "monogram"}
+        owned={ownedAvatars}
+        gemsBalance={row.gems_balance ?? 0}
+        busy={savingColor || savingAvatar}
+        onPickColor={(i) => void changeColor(i)}
+        onEquip={(id) => void equipAvatar(id)}
+        onClose={() => setColorOpen(false)}
+        onGoToShop={() => {
+          setColorOpen(false);
+          setTab("shop");
+        }}
+      />
+
       {/* Top bar */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-ink-200/60 px-5 dark:border-ink-800/60 md:px-8">
         <div className="flex items-center gap-3">
           <div className="relative">
             <button
-              onClick={() => setColorOpen((v) => !v)}
+              onClick={() => setColorOpen(true)}
               className="rounded-full transition-transform hover:scale-105"
-              aria-label="Change avatar colour"
+              aria-label="Change your avatar"
             >
-              <Monogram name={row.display_name} colorIndex={row.avatar_color} size="md" />
+              <Monogram
+                name={row.display_name}
+                colorIndex={row.avatar_color}
+                avatarId={row.equipped_avatar ?? undefined}
+                size="md"
+              />
             </button>
             <span
               className="pointer-events-none absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-obsidian px-1 font-mono text-[9px] font-bold tabular-nums text-warm-ivory ring-2 ring-ink-50 dark:bg-antique-gold dark:text-obsidian dark:ring-ink-950"
@@ -426,34 +472,6 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
             >
               {level.level}
             </span>
-            {colorOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setColorOpen(false)} />
-                <div className="absolute left-0 top-12 z-50 w-64 rounded-card border border-ink-200 bg-warm-ivory p-3 shadow-soft-lg dark:border-ink-700 dark:bg-ink-900">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Palette className="h-3.5 w-3.5 text-ink-400" />
-                    <span className="text-xs font-semibold text-ink-600 dark:text-ink-300">Pick your colour</span>
-                  </div>
-                  <div className="grid grid-cols-6 gap-2">
-                    {AVATAR_PALETTE.map((c, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { void changeColor(i); }}
-                        disabled={savingColor}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold transition-all ${c.bg} ${c.text} ${
-                          row.avatar_color === i
-                            ? "ring-2 ring-offset-2 ring-antique-gold dark:ring-offset-ink-900"
-                            : "hover:scale-110"
-                        }`}
-                        aria-label={`Colour ${i + 1}`}
-                      >
-                        {initialsOf(row.display_name)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -514,6 +532,19 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
               currency={currency}
               gemsBalance={row.gems_balance ?? 0}
               gemsCurrency={gemsCurrency}
+              studentName={row.display_name}
+              ownedAvatars={ownedAvatars}
+              equippedAvatar={row.equipped_avatar ?? "monogram"}
+              onAvatarsChanged={() => {
+                storage
+                  .getMyAvatars()
+                  .then(({ owned }) => setOwnedAvatars(owned))
+                  .catch(() => setOwnedAvatars(["monogram"]));
+                storage
+                  .getMyStudentRow()
+                  .then(setRow)
+                  .catch(() => undefined);
+              }}
               onQuietNote={quietNote}
             />
           </div>

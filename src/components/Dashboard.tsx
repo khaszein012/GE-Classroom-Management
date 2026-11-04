@@ -308,6 +308,7 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
                 <StudentCard
                   key={s.id}
                   colorIndex={index}
+                  avatarId={s.equippedAvatar}
                   name={s.displayName}
                   total={totals[s.id] ?? 0}
                   lifetime={store.lifetime[s.id] ?? 0}
@@ -370,7 +371,12 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
         <PickerOverlay
           students={students
             .filter((s) => s.isActive)
-            .map((s) => ({ id: s.id, displayName: s.displayName, avatarColor: s.avatarColor }))}
+            .map((s) => ({
+              id: s.id,
+              displayName: s.displayName,
+              avatarColor: s.avatarColor,
+              avatarId: s.equippedAvatar,
+            }))}
           classId={store.activeClassId}
           onClose={() => setPickerOpen(false)}
         />

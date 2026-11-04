@@ -19,6 +19,7 @@ interface PickerStudent {
   id: string;
   displayName: string;
   avatarColor: number;
+  avatarId?: string | null;
 }
 
 function loadPicked(): string[] {
@@ -204,7 +205,7 @@ export function PickerOverlay({
                       : "border-white/10 bg-white/[0.03] text-ink-400 hover:bg-white/5"
                   }`}
                 >
-                  <Monogram name={s.displayName} colorIndex={s.avatarColor} size="sm" />
+                  <Monogram name={s.displayName} colorIndex={s.avatarColor} avatarId={s.avatarId} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold">{s.displayName}</span>
                   {on && <Check className="h-4 w-4 shrink-0 text-antique-gold" aria-hidden />}
                 </button>
@@ -318,6 +319,7 @@ export function PickerOverlay({
             <Monogram
               name={display?.displayName ?? "?"}
               colorIndex={display?.avatarColor ?? 0}
+              avatarId={display?.avatarId ?? undefined}
               size="xl"
             />
           </div>

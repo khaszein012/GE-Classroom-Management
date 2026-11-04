@@ -43,7 +43,7 @@ export function PrintCards({ students, onBack }: Props) {
               className="break-inside-avoid rounded-card border border-ink-300 bg-warm-ivory p-3 shadow-soft print:shadow-none"
             >
               <div className="flex items-center gap-2.5">
-                <Monogram name={s.displayName} colorIndex={s.avatarColor} size="sm" />
+                <Monogram name={s.displayName} colorIndex={s.avatarColor} avatarId={s.equippedAvatar} size="sm" />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-ink-900">{s.displayName}</div>
                   <div className="truncate text-xs text-ink-500">{s.username ?? "—"}</div>
