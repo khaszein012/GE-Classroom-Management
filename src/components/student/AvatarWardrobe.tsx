@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Gem, Lock, Sparkles, X } from "lucide-react";
 import { AVATAR_PALETTE, initialsOf } from "@/lib/avatarColor";
 import { AVATARS, RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
+import { NAME_BACKGROUNDS, NAME_BG_RARITY_LABEL } from "@/lib/nameBackgrounds";
 import { Monogram } from "@/components/Monogram";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 
@@ -22,8 +23,12 @@ export function AvatarWardrobe({
   owned,
   gemsBalance,
   busy,
+  ownedNameBgs,
+  equippedNameBgId,
+  busyNameBg,
   onPickColor,
   onEquip,
+  onEquipNameBg,
   onClose,
   onGoToShop,
 }: {
@@ -34,18 +39,23 @@ export function AvatarWardrobe({
   owned: string[];
   gemsBalance: number;
   busy: boolean;
+  ownedNameBgs: string[];
+  equippedNameBgId: string;
+  busyNameBg: boolean;
   onPickColor: (index: number) => void;
   onEquip: (avatarId: string) => void;
+  onEquipNameBg: (nameBgId: string) => void;
   onClose: () => void;
   onGoToShop: () => void;
 }) {
-  const [tab, setTab] = useState<"styles" | "colours">("styles");
+  const [tab, setTab] = useState<"styles" | "colours" | "name">("styles");
   const trapRef = useFocusTrap<HTMLDivElement>(open);
   if (!open) return null;
 
   const ownedSet = new Set(owned);
   const premium = AVATARS.filter((a) => a.price > 0);
   const ownedCount = premium.filter((a) => ownedSet.has(a.id)).length;
+  const nameBgOwnedSet = new Set(ownedNameBgs);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
@@ -54,18 +64,18 @@ export function AvatarWardrobe({
         ref={trapRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Your avatar"
+        aria-label="Your look"
         className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-card border border-ink-200 bg-warm-ivory shadow-soft-lg animate-slide-up dark:border-ink-700 dark:bg-ink-900 sm:rounded-card"
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-ink-200/70 px-4 py-3 dark:border-ink-800/70">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-deep-gold dark:text-antique-gold" aria-hidden />
-            <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-warm-ivory">Your avatar</h2>
+            <h2 className="font-display text-lg font-semibold text-ink-900 dark:text-warm-ivory">Your look</h2>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close avatar"
+            aria-label="Close your look"
             className="flex h-10 w-10 items-center justify-center rounded-button text-ink-500 transition-colors hover:bg-ink-100 dark:text-ink-400 dark:hover:bg-ink-800"
           >
             <X className="h-4 w-4" />
@@ -74,7 +84,7 @@ export function AvatarWardrobe({
 
         {/* Tabs */}
         <div className="flex shrink-0 gap-1 border-b border-ink-200/70 px-3 pt-2 dark:border-ink-800/70" role="tablist">
-          {(["styles", "colours"] as const).map((t) => (
+          {(["styles", "colours", "name"] as const).map((t) => (
             <button
               key={t}
               role="tab"
@@ -86,7 +96,7 @@ export function AvatarWardrobe({
                   : "border-b-2 border-transparent text-ink-500 hover:text-ink-800 dark:text-ink-400 dark:hover:text-ink-200"
               }`}
             >
-              {t === "styles" ? "Styles" : "Colours"}
+              {t === "styles" ? "Styles" : t === "colours" ? "Colours" : "Name"}
             </button>
           ))}
         </div>
@@ -120,6 +130,66 @@ export function AvatarWardrobe({
                 Buy more styles in the Shop
                 <span className="ml-1 font-mono text-xs tabular-nums opacity-70">· {gemsBalance} gems</span>
               </button>
+            </>
+          ) : tab === "name" ? (
+            <>
+              <p className="mb-3 text-xs text-ink-500 dark:text-ink-400">
+                A nameplate behind your name on your dashboard. Buy more in the Shop.
+              </p>
+              <div className="space-y-2">
+                {NAME_BACKGROUNDS.map((b) => {
+                  const isOwned = b.price === 0 || nameBgOwnedSet.has(b.id);
+                  const equipped = equippedNameBgId === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={isOwned && !equipped ? () => onEquipNameBg(b.id) : undefined}
+                      disabled={busyNameBg || !isOwned || equipped}
+                      aria-pressed={equipped}
+                      aria-label={`${b.name} name style${equipped ? " (equipped)" : isOwned ? "" : " — locked"}`}
+                      className={`flex w-full items-center justify-between gap-3 rounded-card border px-3 py-2.5 transition-colors ${
+                        equipped
+                          ? "border-antique-gold bg-antique-gold/10"
+                          : isOwned
+                            ? "border-ink-200 hover:bg-ink-50 dark:border-ink-700 dark:hover:bg-ink-800"
+                            : "border-dashed border-ink-200 dark:border-ink-700"
+                      } disabled:cursor-default`}
+                    >
+                      {/* Preview: the actual nameplate treatment */}
+                      <span className="min-w-0 flex-1 text-left">
+                        {b.plate ? (
+                          <span className={`relative inline-block max-w-[220px] truncate rounded-full px-3 py-0.5 text-sm font-bold ${b.plate} ${b.text}`}>
+                            {b.flourish && (
+                              <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${b.flourish}`} />
+                            )}
+                            <span className="relative">{name}</span>
+                          </span>
+                        ) : (
+                          <span className="text-sm font-bold text-ink-900 dark:text-warm-ivory">{name}</span>
+                        )}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 dark:text-ink-500">
+                          {NAME_BG_RARITY_LABEL[b.rarity]}
+                        </span>
+                        {equipped ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-antique-gold">
+                            <Check className="h-3 w-3 text-obsidian" aria-hidden />
+                          </span>
+                        ) : isOwned ? (
+                          <span className="text-xs font-semibold text-deep-gold dark:text-antique-gold">Equip</span>
+                        ) : (
+                          <span className="flex items-center gap-0.5 font-mono text-xs font-bold tabular-nums text-ink-400">
+                            <Lock className="h-3 w-3" aria-hidden />
+                            <Gem className="h-3 w-3" aria-hidden />
+                            {b.price}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </>
           ) : (
             <>

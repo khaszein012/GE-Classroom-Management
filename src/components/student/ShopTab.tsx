@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock, Gem, LayoutGrid, List, Sparkles, Store, X } from "lucide-react";
+import { Clock, Gem, LayoutGrid, List, Sparkles, Store, Tag, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import * as storage from "@/lib/storage";
 import type { Reward, RewardCurrency, CurrencySettings } from "@/types";
@@ -8,6 +8,7 @@ import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { RewardThumbnail } from "@/components/RewardThumbnail";
 import { Monogram } from "@/components/Monogram";
 import { purchasableAvatars, RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
+import { purchasableNameBackgrounds, NAME_BG_RARITY_LABEL, type NameBgDef } from "@/lib/nameBackgrounds";
 
 export interface MyRedemption {
   id: string;
@@ -48,6 +49,8 @@ export function ShopTab({
   studentName,
   ownedAvatars,
   equippedAvatar,
+  ownedNameBgs,
+  equippedNameBg,
   onAvatarsChanged,
   onQuietNote,
 }: {
@@ -59,6 +62,8 @@ export function ShopTab({
   studentName: string;
   ownedAvatars: string[];
   equippedAvatar: string;
+  ownedNameBgs: string[];
+  equippedNameBg: string;
   /** Called after a successful purchase so the parent can refresh the wardrobe. */
   onAvatarsChanged: () => void;
   onQuietNote: (message: string) => void;
@@ -367,6 +372,16 @@ export function ShopTab({
         studentName={studentName}
         owned={ownedAvatars}
         equippedId={equippedAvatar}
+        gemsBalance={gemsBalance}
+        gemsLabel={gemsCurrency.plural}
+        onChanged={onAvatarsChanged}
+        onQuietNote={onQuietNote}
+      />
+
+      <NameStyleStoreSection
+        studentName={studentName}
+        owned={ownedNameBgs}
+        equippedId={equippedNameBg}
         gemsBalance={gemsBalance}
         gemsLabel={gemsCurrency.plural}
         onChanged={onAvatarsChanged}
@@ -909,6 +924,163 @@ function AvatarStoreSection({
               <span className="font-mono font-bold tabular-nums">{confirming.price}</span>{" "}
               {gemsLabel.toLowerCase()} ·{" "}
               {gemsBalance - confirming.price} after · yours forever, equip anytime
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setConfirming(null)}
+                className="min-h-11 rounded-button px-4 text-sm font-semibold text-ink-500 hover:bg-ink-100 dark:text-ink-400 dark:hover:bg-ink-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void buy(confirming)}
+                disabled={busy === confirming.id || gemsBalance < confirming.price}
+                className="min-h-11 rounded-button bg-antique-gold px-4 text-sm font-bold text-obsidian transition-colors hover:bg-deep-gold disabled:opacity-60"
+              >
+                {busy === confirming.id ? "Buying…" : "Buy"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Premium name styles — the nameplate behind the student's name on their
+ * dashboard. Gem-priced with an escalating ladder (10 → 25 → 50 → 80).
+ * Instant buy + auto-equip, same server-validated flow as avatar styles.
+ */
+function NameStyleStoreSection({
+  studentName,
+  owned,
+  equippedId,
+  gemsBalance,
+  gemsLabel,
+  onChanged,
+  onQuietNote,
+}: {
+  studentName: string;
+  owned: string[];
+  equippedId: string;
+  gemsBalance: number;
+  gemsLabel: string;
+  onChanged: () => void;
+  onQuietNote: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<NameBgDef | null>(null);
+  const ownedSet = new Set(owned);
+  const items = purchasableNameBackgrounds();
+
+  const buy = async (item: NameBgDef) => {
+    setBusy(item.id);
+    setError(null);
+    try {
+      await storage.buyNameBackground(item.id);
+      await storage.equipNameBackground(item.id);
+      onChanged();
+      onQuietNote(`${item.name} name style is yours — equipped!`);
+      setConfirming(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not buy that name style. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <Tag className="h-4 w-4 text-deep-gold dark:text-antique-gold" aria-hidden />
+        <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-600 dark:text-ink-300">
+          Name styles
+        </h2>
+        <span className="rounded-full bg-ivory-dim px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
+          Gems only
+        </span>
+      </div>
+      {error && (
+        <p className="mb-3 rounded-card border border-warm-brick/30 bg-warm-brick/10 px-3 py-2 text-sm text-warm-brick dark:border-brick-light/20 dark:text-brick-light">
+          {error}
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {items.map((b) => {
+          const isOwned = ownedSet.has(b.id);
+          const equipped = equippedId === b.id;
+          const affordable = gemsBalance >= b.price;
+          return (
+            <div
+              key={b.id}
+              className={`flex items-center justify-between gap-3 rounded-card border px-4 py-3 ${
+                equipped
+                  ? "border-antique-gold/60 bg-antique-gold/10"
+                  : "border-ink-200/70 bg-warm-ivory shadow-soft dark:border-ink-800/70 dark:bg-ink-900"
+              }`}
+            >
+              <div className="min-w-0">
+                {/* Real nameplate preview */}
+                {b.plate ? (
+                  <span className={`relative inline-block max-w-[180px] truncate rounded-full px-3 py-0.5 text-sm font-bold ${b.plate} ${b.text}`}>
+                    {b.flourish && (
+                      <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${b.flourish}`} />
+                    )}
+                    <span className="relative">{studentName}</span>
+                  </span>
+                ) : (
+                  <span className="text-sm font-bold text-ink-900 dark:text-warm-ivory">{studentName}</span>
+                )}
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-ink-400 dark:text-ink-500">
+                  {NAME_BG_RARITY_LABEL[b.rarity]}
+                </p>
+              </div>
+              {equipped ? (
+                <span className="shrink-0 rounded-button bg-ivory-dim px-3 py-1.5 text-xs font-bold text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold">
+                  Equipped
+                </span>
+              ) : isOwned ? (
+                <span className="shrink-0 rounded-button bg-ink-100 px-3 py-1.5 text-xs font-semibold text-ink-500 dark:bg-ink-800 dark:text-ink-400">
+                  Owned
+                </span>
+              ) : (
+                <button
+                  onClick={() => setConfirming(b)}
+                  disabled={busy === b.id}
+                  className={`flex shrink-0 items-center gap-1 rounded-button px-3 py-1.5 text-xs font-bold transition-colors ${
+                    affordable
+                      ? "bg-antique-gold text-obsidian hover:bg-deep-gold"
+                      : "bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500"
+                  } disabled:opacity-60`}
+                >
+                  <Gem className="h-3 w-3" aria-hidden />
+                  {b.price}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {confirming && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/40 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={() => setConfirming(null)}
+        >
+          <div
+            className="w-full max-w-sm animate-fade-scale-in rounded-t-card bg-warm-ivory p-6 shadow-soft-lg dark:bg-ink-900 sm:rounded-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-ink-900 dark:text-warm-ivory">
+              Buy "{confirming.name}" name style?
+            </h3>
+            <p className="mt-2 text-sm text-ink-600 dark:text-ink-300">
+              It costs{" "}
+              <span className="font-mono font-bold tabular-nums">{confirming.price}</span>{" "}
+              {gemsLabel.toLowerCase()} ·{" "}
+              {gemsBalance - confirming.price} after · yours forever
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button

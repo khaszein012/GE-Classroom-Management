@@ -6,6 +6,7 @@ import type { StudentSafeRow } from "@/lib/storage";
 import { useCountUp } from "@/lib/useCountUp";
 import { Monogram } from "@/components/Monogram";
 import { AvatarWardrobe } from "@/components/student/AvatarWardrobe";
+import { nameBgById } from "@/lib/nameBackgrounds";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { Skeleton } from "@/components/Skeleton";
 import { buildActivityGroups, buildTrend } from "@/components/student/activity";
@@ -58,6 +59,8 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const [savingColor, setSavingColor] = useState(false);
   const [ownedAvatars, setOwnedAvatars] = useState<string[]>(["monogram"]);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [ownedNameBgs, setOwnedNameBgs] = useState<string[]>(["none"]);
+  const [savingNameBg, setSavingNameBg] = useState(false);
   const newIdsRef = useRef<Set<string>>(new Set());
 
   const quietNote = useCallback((message: string) => {
@@ -90,6 +93,10 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         .getMyAvatars()
         .then(({ owned }) => setOwnedAvatars(owned))
         .catch(() => setOwnedAvatars(["monogram"]));
+      storage
+        .getMyNameBackgrounds()
+        .then(({ owned }) => setOwnedNameBgs(owned))
+        .catch(() => setOwnedNameBgs(["none"]));
       const mapped = txns.map(storage.mapTransactionRow);
       if (markNew && prevIds) {
         const fresh = mapped.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
@@ -335,6 +342,23 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
     [quietNote],
   );
 
+  /** Equip an owned name style (ownership is re-checked server-side). */
+  const equipNameBg = useCallback(
+    async (nameBgId: string) => {
+      setSavingNameBg(true);
+      try {
+        await storage.equipNameBackground(nameBgId);
+        setRow((prev) => (prev ? { ...prev, equipped_name_bg: nameBgId } : prev));
+        quietNote("Name style updated.");
+      } catch (e) {
+        quietNote(e instanceof Error ? e.message : "Could not equip that name style.");
+      } finally {
+        setSavingNameBg(false);
+      }
+    },
+    [quietNote],
+  );
+
   const groups = useMemo(() => buildActivityGroups(transactions), [transactions]);
   const trend = useMemo(() => buildTrend(transactions), [transactions]);
   const hasMore = transactions.length >= PAGE_SIZE && transactions.length % PAGE_SIZE === 0;
@@ -441,8 +465,12 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         owned={ownedAvatars}
         gemsBalance={row.gems_balance ?? 0}
         busy={savingColor || savingAvatar}
+        ownedNameBgs={ownedNameBgs}
+        equippedNameBgId={row.equipped_name_bg ?? "none"}
+        busyNameBg={savingNameBg}
         onPickColor={(i) => void changeColor(i)}
         onEquip={(id) => void equipAvatar(id)}
+        onEquipNameBg={(id) => void equipNameBg(id)}
         onClose={() => setColorOpen(false)}
         onGoToShop={() => {
           setColorOpen(false);
@@ -475,7 +503,25 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="max-w-[140px] truncate text-[15px] font-bold leading-tight text-ink-900 dark:text-warm-ivory sm:max-w-[220px]">{row.display_name}</h1>
+              {(() => {
+                const nameBg = nameBgById(row.equipped_name_bg ?? "none");
+                const base =
+                  "block max-w-[140px] truncate text-[15px] font-bold leading-tight sm:max-w-[220px]";
+                // "none" (free) renders the plain name — identical to the
+                // pre-cosmetic look, so nobody's name got worse.
+                return nameBg.plate ? (
+                  <h1
+                    className={`${base} relative rounded-full px-3 py-0.5 ${nameBg.plate} ${nameBg.text}`}
+                  >
+                    {nameBg.flourish && (
+                      <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${nameBg.flourish}`} />
+                    )}
+                    <span className="relative">{row.display_name}</span>
+                  </h1>
+                ) : (
+                  <h1 className={`${base} text-ink-900 dark:text-warm-ivory`}>{row.display_name}</h1>
+                );
+              })()}
               <span
                 className="shrink-0 rounded-full bg-ivory-dim px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold"
                 title="Your level — grows as you earn"
@@ -535,11 +581,17 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
               studentName={row.display_name}
               ownedAvatars={ownedAvatars}
               equippedAvatar={row.equipped_avatar ?? "monogram"}
+              ownedNameBgs={ownedNameBgs}
+              equippedNameBg={row.equipped_name_bg ?? "none"}
               onAvatarsChanged={() => {
                 storage
                   .getMyAvatars()
                   .then(({ owned }) => setOwnedAvatars(owned))
                   .catch(() => setOwnedAvatars(["monogram"]));
+                storage
+                  .getMyNameBackgrounds()
+                  .then(({ owned }) => setOwnedNameBgs(owned))
+                  .catch(() => setOwnedNameBgs(["none"]));
                 storage
                   .getMyStudentRow()
                   .then(setRow)

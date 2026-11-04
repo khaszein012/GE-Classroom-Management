@@ -19,6 +19,7 @@ interface StudentRow {
   avatar_emoji: string;
   avatar_color: number;
   equipped_avatar?: string | null;
+  equipped_name_bg?: string | null;
   username: string | null;
   pin_hash: string | null;
   is_active: boolean;
@@ -429,6 +430,7 @@ export interface StudentSafeRow {
   avatar_color: number;
   /** Premium avatar id (null/absent before the avatars migration). */
   equipped_avatar?: string | null;
+  equipped_name_bg?: string | null;
   behavior_currency: { singular: string; plural: string; icon: string; color: string } | null;
   achievement_currency?: { singular: string; plural: string; icon: string; color: string } | null;
   balance: number;
@@ -547,6 +549,40 @@ export async function buyAvatar(avatarId: string): Promise<{ gems_remaining: num
 /** Equip an owned avatar (ownership is enforced inside the RPC). */
 export async function equipAvatar(avatarId: string): Promise<void> {
   const { error } = await supabase.rpc("equip_avatar", { p_avatar_id: avatarId });
+  if (error) throw new Error(error.message);
+}
+
+// ---------- Premium name backgrounds (student nameplates) ----------
+
+/**
+ * The signed-in student's name-style ownership + equipped id. Fails soft
+ * upstream: before the name-backgrounds migration the table is absent, so
+ * the caller falls back to the classic plain name.
+ */
+export async function getMyNameBackgrounds(): Promise<{ owned: string[]; equipped: string }> {
+  const [ownedRes, meRes] = await Promise.all([
+    supabase.from("student_name_backgrounds").select("name_bg_id"),
+    supabase.from("students_safe").select("equipped_name_bg").maybeSingle(),
+  ]);
+  if (ownedRes.error) throw new Error(ownedRes.error.message);
+  if (meRes.error) throw new Error(meRes.error.message);
+  const owned = ((ownedRes.data ?? []) as { name_bg_id: string }[]).map((r) => r.name_bg_id);
+  const equipped =
+    ((meRes.data ?? null) as { equipped_name_bg?: string } | null)?.equipped_name_bg ?? "none";
+  return { owned, equipped };
+}
+
+/** Buy a name style with gems. Price and balance are validated server-side. */
+export async function buyNameBackground(nameBgId: string): Promise<{ gems_remaining: number }> {
+  const { data, error } = await supabase.rpc("buy_name_background", { p_name_bg_id: nameBgId });
+  if (error) throw new Error(error.message);
+  const r = (data ?? {}) as { gems_remaining?: number };
+  return { gems_remaining: r.gems_remaining ?? 0 };
+}
+
+/** Equip an owned name style (ownership is enforced inside the RPC). */
+export async function equipNameBackground(nameBgId: string): Promise<void> {
+  const { error } = await supabase.rpc("equip_name_background", { p_name_bg_id: nameBgId });
   if (error) throw new Error(error.message);
 }
 
