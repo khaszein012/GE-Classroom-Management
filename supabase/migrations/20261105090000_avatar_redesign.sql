@@ -14,7 +14,18 @@ security model are unchanged.
 This migration only refreshes the server catalog: renamed styles, two new
 Epic entries (aurora 80, nebula 80). Idempotent upsert — existing ownership
 rows are untouched, students keep everything they bought.
+
+NOTE: the catalog table was created (20261104090000) with a rarity CHECK
+allowing only free/uncommon/rare — it predates the Epic tier. The check is
+widened here BEFORE the seed, otherwise the epic rows are rejected with
+"violates check constraint avatar_catalog_rarity_check".
 */
+
+-- ===== 0. Widen the rarity check to include 'epic' ==========================
+
+ALTER TABLE public.avatar_catalog DROP CONSTRAINT IF EXISTS avatar_catalog_rarity_check;
+ALTER TABLE public.avatar_catalog ADD CONSTRAINT avatar_catalog_rarity_check
+  CHECK (rarity IN ('free', 'uncommon', 'rare', 'epic'));
 
 INSERT INTO public.avatar_catalog (id, name, rarity, price, sort_order) VALUES
   ('monogram',      'Classic',       'free',      0,  0),
