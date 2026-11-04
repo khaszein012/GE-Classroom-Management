@@ -7,6 +7,8 @@ import { useCountUp } from "@/lib/useCountUp";
 import { Monogram } from "@/components/Monogram";
 import { AvatarWardrobe } from "@/components/student/AvatarWardrobe";
 import { Nameplate } from "@/components/Nameplate";
+import { AVATARS, mergeAvatarCatalog, type AvatarDef } from "@/lib/avatars";
+import { NAME_BACKGROUNDS, mergeNameBgCatalog, type NameBgDef } from "@/lib/nameBackgrounds";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { Skeleton } from "@/components/Skeleton";
 import { buildActivityGroups, buildTrend } from "@/components/student/activity";
@@ -61,6 +63,11 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [ownedNameBgs, setOwnedNameBgs] = useState<string[]>(["none"]);
   const [savingNameBg, setSavingNameBg] = useState(false);
+  // Cosmetic catalogs: server prices overlaid on local art. The DB is the
+  // source of truth for prices, so the shop always shows what the server
+  // will actually charge.
+  const [avatarStyles, setAvatarStyles] = useState<AvatarDef[]>([...AVATARS]);
+  const [nameStyles, setNameStyles] = useState<NameBgDef[]>([...NAME_BACKGROUNDS]);
   const newIdsRef = useRef<Set<string>>(new Set());
 
   const quietNote = useCallback((message: string) => {
@@ -97,6 +104,15 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         .getMyNameBackgrounds()
         .then(({ owned }) => setOwnedNameBgs(owned))
         .catch(() => setOwnedNameBgs(["none"]));
+      // Catalog prices: fail soft to the bundled defaults pre-migration.
+      storage
+        .getAvatarCatalog()
+        .then((rows) => setAvatarStyles(mergeAvatarCatalog(rows)))
+        .catch(() => setAvatarStyles([...AVATARS]));
+      storage
+        .getNameBgCatalog()
+        .then((rows) => setNameStyles(mergeNameBgCatalog(rows)))
+        .catch(() => setNameStyles([...NAME_BACKGROUNDS]));
       const mapped = txns.map(storage.mapTransactionRow);
       if (markNew && prevIds) {
         const fresh = mapped.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
@@ -466,6 +482,8 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
         gemsBalance={row.gems_balance ?? 0}
         busy={savingColor || savingAvatar}
         ownedNameBgs={ownedNameBgs}
+        avatarStyles={avatarStyles}
+        nameStyles={nameStyles}
         equippedNameBgId={row.equipped_name_bg ?? "none"}
         busyNameBg={savingNameBg}
         onPickColor={(i) => void changeColor(i)}
@@ -572,6 +590,8 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
               equippedAvatar={row.equipped_avatar ?? "monogram"}
               ownedNameBgs={ownedNameBgs}
               equippedNameBg={row.equipped_name_bg ?? "none"}
+              avatarStyles={avatarStyles}
+              nameStyles={nameStyles}
               onAvatarsChanged={() => {
                 storage
                   .getMyAvatars()
@@ -581,6 +601,14 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
                   .getMyNameBackgrounds()
                   .then(({ owned }) => setOwnedNameBgs(owned))
                   .catch(() => setOwnedNameBgs(["none"]));
+                storage
+                  .getAvatarCatalog()
+                  .then((rows) => setAvatarStyles(mergeAvatarCatalog(rows)))
+                  .catch(() => undefined);
+                storage
+                  .getNameBgCatalog()
+                  .then((rows) => setNameStyles(mergeNameBgCatalog(rows)))
+                  .catch(() => undefined);
                 storage
                   .getMyStudentRow()
                   .then(setRow)

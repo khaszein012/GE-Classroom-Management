@@ -162,6 +162,24 @@ export function purchasableAvatars(): AvatarDef[] {
   return AVATARS.filter((a) => a.price > 0);
 }
 
+/**
+ * Overlay the server catalog onto the local visuals: the DB wins for price,
+ * display name and sort order, the client supplies the artwork. Styles
+ * present only in the DB (no client art) are skipped — they could never be
+ * rendered. If the catalog can't be read (pre-migration), the local prices
+ * stand and everything keeps working.
+ */
+export function mergeAvatarCatalog(rows: { id: string; name: string; price: number; sort_order: number }[] | null): AvatarDef[] {
+  if (!rows || rows.length === 0) return [...AVATARS].sort((a, b) => a.price - b.price);
+  const out: AvatarDef[] = [];
+  for (const row of rows) {
+    const def = BY_ID.get(row.id);
+    if (!def) continue;
+    out.push({ ...def, name: row.name, price: row.price });
+  }
+  return out;
+}
+
 export const RARITY_LABEL: Record<AvatarRarity, string> = {
   free: "Starter",
   uncommon: "Uncommon",

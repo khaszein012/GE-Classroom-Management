@@ -136,6 +136,23 @@ export function purchasableNameBackgrounds(): NameBgDef[] {
   return NAME_BACKGROUNDS.filter((b) => b.price > 0);
 }
 
+/**
+ * Overlay the server catalog onto the local visuals: the DB wins for price,
+ * display name and sort order, the client supplies the artwork. Styles
+ * present only in the DB (no client art) are skipped. If the catalog can't
+ * be read (pre-migration), the local prices stand and everything works.
+ */
+export function mergeNameBgCatalog(rows: { id: string; name: string; price: number; sort_order: number }[] | null): NameBgDef[] {
+  if (!rows || rows.length === 0) return [...NAME_BACKGROUNDS].sort((a, b) => a.price - b.price);
+  const out: NameBgDef[] = [];
+  for (const row of rows) {
+    const def = BY_ID.get(row.id);
+    if (!def) continue;
+    out.push({ ...def, name: row.name, price: row.price });
+  }
+  return out;
+}
+
 export const NAME_BG_RARITY_LABEL: Record<NameBgRarity, string> = {
   free: "Starter",
   uncommon: "Uncommon",

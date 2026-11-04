@@ -587,6 +587,58 @@ export async function equipNameBackground(nameBgId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ---------- Cosmetic catalogs (server-priced) ----------
+
+export interface CosmeticCatalogRow {
+  id: string;
+  name: string;
+  rarity: string;
+  price: number;
+  sort_order: number;
+}
+
+/**
+ * The server-side avatar price list. The DB is the source of truth for
+ * prices (buy_avatar validates against it); the client catalog in
+ * lib/avatars.ts owns the visuals. Merge with mergeAvatarCatalog().
+ */
+export async function getAvatarCatalog(): Promise<CosmeticCatalogRow[]> {
+  const { data, error } = await supabase
+    .from("avatar_catalog")
+    .select("*")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as CosmeticCatalogRow[];
+}
+
+/** The server-side name-style price list. */
+export async function getNameBgCatalog(): Promise<CosmeticCatalogRow[]> {
+  const { data, error } = await supabase
+    .from("name_bg_catalog")
+    .select("*")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as CosmeticCatalogRow[];
+}
+
+/** Teacher-only (RPC enforces the claim): tune a premium avatar's gem price. */
+export async function updateAvatarPrice(avatarId: string, price: number): Promise<void> {
+  const { error } = await supabase.rpc("update_avatar_price", {
+    p_id: avatarId,
+    p_price: price,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Teacher-only (RPC enforces the claim): tune a name style's gem price. */
+export async function updateNameBgPrice(nameBgId: string, price: number): Promise<void> {
+  const { error } = await supabase.rpc("update_name_bg_price", {
+    p_id: nameBgId,
+    p_price: price,
+  });
+  if (error) throw new Error(error.message);
+}
+
 // ---------- Migration helper ----------
 
 export async function insertStudentsRaw(

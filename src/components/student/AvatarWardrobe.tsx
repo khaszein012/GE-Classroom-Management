@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Check, Gem, Lock, Sparkles, X } from "lucide-react";
 import { AVATAR_PALETTE, initialsOf } from "@/lib/avatarColor";
-import { AVATARS, RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
-import { NAME_BACKGROUNDS, NAME_BG_RARITY_LABEL } from "@/lib/nameBackgrounds";
+import { RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
+import { NAME_BG_RARITY_LABEL, type NameBgDef } from "@/lib/nameBackgrounds";
 import { Monogram } from "@/components/Monogram";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 
@@ -26,6 +26,8 @@ export function AvatarWardrobe({
   ownedNameBgs,
   equippedNameBgId,
   busyNameBg,
+  avatarStyles,
+  nameStyles,
   onPickColor,
   onEquip,
   onEquipNameBg,
@@ -42,6 +44,9 @@ export function AvatarWardrobe({
   ownedNameBgs: string[];
   equippedNameBgId: string;
   busyNameBg: boolean;
+  /** Server-priced catalogs merged with local visuals — DB wins on price. */
+  avatarStyles: AvatarDef[];
+  nameStyles: NameBgDef[];
   onPickColor: (index: number) => void;
   onEquip: (avatarId: string) => void;
   onEquipNameBg: (nameBgId: string) => void;
@@ -53,7 +58,7 @@ export function AvatarWardrobe({
   if (!open) return null;
 
   const ownedSet = new Set(owned);
-  const premium = AVATARS.filter((a) => a.price > 0);
+  const premium = avatarStyles.filter((a) => a.price > 0);
   const ownedCount = premium.filter((a) => ownedSet.has(a.id)).length;
   const nameBgOwnedSet = new Set(ownedNameBgs);
 
@@ -108,7 +113,7 @@ export function AvatarWardrobe({
                 {ownedCount} of {premium.length} premium styles owned
               </p>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                {AVATARS.map((a) => (
+                {avatarStyles.map((a) => (
                   <StyleTile
                     key={a.id}
                     avatar={a}
@@ -137,7 +142,7 @@ export function AvatarWardrobe({
                 A nameplate behind your name on your dashboard. Buy more in the Shop.
               </p>
               <div className="space-y-2">
-                {NAME_BACKGROUNDS.map((b) => {
+                {nameStyles.map((b) => {
                   const isOwned = b.price === 0 || nameBgOwnedSet.has(b.id);
                   const equipped = equippedNameBgId === b.id;
                   return (

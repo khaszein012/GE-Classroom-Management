@@ -7,8 +7,8 @@ import { relativeTime } from "@/lib/time";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { RewardThumbnail } from "@/components/RewardThumbnail";
 import { Monogram } from "@/components/Monogram";
-import { purchasableAvatars, RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
-import { purchasableNameBackgrounds, NAME_BG_RARITY_LABEL, type NameBgDef } from "@/lib/nameBackgrounds";
+import { RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
+import { NAME_BG_RARITY_LABEL, type NameBgDef } from "@/lib/nameBackgrounds";
 
 export interface MyRedemption {
   id: string;
@@ -51,6 +51,8 @@ export function ShopTab({
   equippedAvatar,
   ownedNameBgs,
   equippedNameBg,
+  avatarStyles,
+  nameStyles,
   onAvatarsChanged,
   onQuietNote,
 }: {
@@ -64,6 +66,9 @@ export function ShopTab({
   equippedAvatar: string;
   ownedNameBgs: string[];
   equippedNameBg: string;
+  /** Server-priced catalogs merged with local visuals — DB wins on price. */
+  avatarStyles: AvatarDef[];
+  nameStyles: NameBgDef[];
   /** Called after a successful purchase so the parent can refresh the wardrobe. */
   onAvatarsChanged: () => void;
   onQuietNote: (message: string) => void;
@@ -374,6 +379,7 @@ export function ShopTab({
         equippedId={equippedAvatar}
         gemsBalance={gemsBalance}
         gemsLabel={gemsCurrency.plural}
+        avatarStyles={avatarStyles}
         onChanged={onAvatarsChanged}
         onQuietNote={onQuietNote}
       />
@@ -384,6 +390,7 @@ export function ShopTab({
         equippedId={equippedNameBg}
         gemsBalance={gemsBalance}
         gemsLabel={gemsCurrency.plural}
+        nameStyles={nameStyles}
         onChanged={onAvatarsChanged}
         onQuietNote={onQuietNote}
       />
@@ -803,6 +810,7 @@ function AvatarStoreSection({
   equippedId,
   gemsBalance,
   gemsLabel,
+  avatarStyles,
   onChanged,
   onQuietNote,
 }: {
@@ -811,6 +819,8 @@ function AvatarStoreSection({
   equippedId: string;
   gemsBalance: number;
   gemsLabel: string;
+  /** Server-priced catalog merged with local visuals. */
+  avatarStyles: AvatarDef[];
   onChanged: () => void;
   onQuietNote: (message: string) => void;
 }) {
@@ -818,7 +828,7 @@ function AvatarStoreSection({
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<AvatarDef | null>(null);
   const ownedSet = new Set(owned);
-  const items = purchasableAvatars();
+  const items = avatarStyles.filter((a) => a.price > 0);
 
   const buy = async (avatar: AvatarDef) => {
     setBusy(avatar.id);
@@ -958,6 +968,7 @@ function NameStyleStoreSection({
   equippedId,
   gemsBalance,
   gemsLabel,
+  nameStyles,
   onChanged,
   onQuietNote,
 }: {
@@ -966,6 +977,8 @@ function NameStyleStoreSection({
   equippedId: string;
   gemsBalance: number;
   gemsLabel: string;
+  /** Server-priced catalog merged with local visuals. */
+  nameStyles: NameBgDef[];
   onChanged: () => void;
   onQuietNote: (message: string) => void;
 }) {
@@ -973,7 +986,7 @@ function NameStyleStoreSection({
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<NameBgDef | null>(null);
   const ownedSet = new Set(owned);
-  const items = purchasableNameBackgrounds();
+  const items = nameStyles.filter((b) => b.price > 0);
 
   const buy = async (item: NameBgDef) => {
     setBusy(item.id);

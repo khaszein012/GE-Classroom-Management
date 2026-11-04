@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Check, Download, KeyRound } from "lucide-react";
+import { Check, Download, Gem, KeyRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { CurrencyColor, CurrencyConfig, CurrencyKind, CurrencySettings } from "@/types";
 import type { Store } from "@/lib/useStore";
-import { getQuizAttempts } from "@/lib/storage";
+import { getAvatarCatalog, getNameBgCatalog, getQuizAttempts, updateAvatarPrice, updateNameBgPrice, type CosmeticCatalogRow } from "@/lib/storage";
 import { downloadCsv } from "@/lib/csv";
 import {
   CURRENCY_COLORS,
@@ -16,6 +16,8 @@ import { CurrencyAmount, CurrencyIcon } from "@/components/CurrencyAmount";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { useToast } from "@/components/Toast";
 import { ThemePicker } from "@/components/ThemePicker";
+import { Nameplate } from "@/components/Nameplate";
+import { Monogram } from "@/components/Monogram";
 import type { ColorTheme } from "@/lib/themes";
 
 interface Props {
@@ -73,6 +75,19 @@ export function SettingsScreen({ config, onUpdateCurrency, settingsError, onRetr
           </p>
           <div className="mt-4">
             <ThemePicker current={colorTheme} onSelect={onUpdateColorTheme} />
+          </div>
+        </section>
+
+        <section className="mt-8">
+          <h2 className="text-[11px] font-bold uppercase tracking-wider text-ink-400 dark:text-ink-500">
+            Premium styles
+          </h2>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            The avatar and name styles students buy with gems. Adjust a price and it applies to
+            the shop and to what the server charges — no republish needed.
+          </p>
+          <div className="mt-4">
+            <PremiumStylesSection />
           </div>
         </section>
 
@@ -838,6 +853,158 @@ function NameField({
         }`}
       />
       {error && <p className="mt-1 text-xs text-warm-brick">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Teacher price editor for the gem-priced cosmetics (avatar styles and name
+ * styles). Reads the server catalogs — the same tables the buy RPCs check —
+ * so what's shown here is exactly what the server charges. Saving writes
+ * through teacher-only RPCs; the student shop reads prices from these
+ * tables at load time, so changes apply without republishing.
+ */
+export function PremiumStylesSection() {
+  const toast = useToast();
+  const [avatarRows, setAvatarRows] = useState<CosmeticCatalogRow[] | null>(null);
+  const [nameRows, setNameRows] = useState<CosmeticCatalogRow[] | null>(null);
+  const [error, setError] = useState(false);
+  // Draft prices keyed by catalog id — inputs stay editable while dirty.
+  const [drafts, setDrafts] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const [avatars, names] = await Promise.all([getAvatarCatalog(), getNameBgCatalog()]);
+      setAvatarRows(avatars);
+      setNameRows(names);
+      setDrafts({});
+      setError(false);
+    } catch {
+      setError(true);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const save = async (
+    kind: "avatar" | "name",
+    id: string,
+    price: number,
+    label: string,
+  ) => {
+    setSaving(id);
+    try {
+      if (kind === "avatar") await updateAvatarPrice(id, price);
+      else await updateNameBgPrice(id, price);
+      // Reflect the new price immediately — the RPC result is authoritative.
+      if (kind === "avatar") setAvatarRows((rows) => rows?.map((r) => (r.id === id ? { ...r, price } : r)) ?? rows);
+      else setNameRows((rows) => rows?.map((r) => (r.id === id ? { ...r, price } : r)) ?? rows);
+      setDrafts((d) => {
+        const rest = { ...d };
+        delete rest[id];
+        return rest;
+      });
+      toast.show(`${label} price saved`, "positive");
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Could not save the price.", "negative");
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="rounded-card border border-warm-brick/30 bg-warm-brick/10 px-4 py-3 text-sm text-warm-brick dark:border-brick-light/20 dark:text-brick-light">
+        Couldn't load the style catalogs. If you haven't applied the premium-style migrations yet,
+        do that first.
+      </div>
+    );
+  }
+  if (!avatarRows || !nameRows) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-14 animate-pulse rounded-card bg-ink-100 dark:bg-ink-800/60" />
+        ))}
+      </div>
+    );
+  }
+
+  const groups: {
+    title: string;
+    kind: "avatar" | "name";
+    rows: CosmeticCatalogRow[];
+    render: (row: CosmeticCatalogRow) => React.ReactNode;
+  }[] = [
+    {
+      title: "Avatar styles",
+      kind: "avatar",
+      rows: avatarRows,
+      render: (row) => (
+        <Monogram name="Student" colorIndex={0} avatarId={row.id === "monogram" ? undefined : row.id} size="md" />
+      ),
+    },
+    {
+      title: "Name styles",
+      kind: "name",
+      rows: nameRows,
+      render: (row) => <Nameplate name="Student" bgId={row.id} className="text-sm font-bold" />,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {groups.map((g) => (
+        <div key={g.kind}>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink-600 dark:text-ink-300">
+            <Gem className="h-3.5 w-3.5 text-deep-gold dark:text-antique-gold" aria-hidden />
+            {g.title}
+          </p>
+          <ul className="overflow-hidden rounded-card border border-ink-200/70 dark:border-ink-800/70">
+            {g.rows.map((row, idx) => {
+              const draft = drafts[row.id];
+              const dirty = draft !== undefined && draft !== row.price;
+              return (
+                <li
+                  key={row.id}
+                  className={`flex items-center gap-3 px-4 py-3 ${
+                    idx > 0 ? "border-t border-ink-200/70 dark:border-ink-800/70" : ""
+                  }`}
+                >
+                  <div className="w-12 shrink-0">{g.render(row)}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink-800 dark:text-ink-100">{row.name}</p>
+                    <p className="text-[11px] capitalize text-ink-400 dark:text-ink-500">{row.rarity}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Gem className="h-3.5 w-3.5 text-deep-gold dark:text-antique-gold" aria-hidden />
+                    <input
+                      value={draft ?? row.price}
+                      inputMode="numeric"
+                      aria-label={`${row.name} price in gems`}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, "").slice(0, 7);
+                        setDrafts((d) => ({ ...d, [row.id]: Number(digits || 0) }));
+                      }}
+                      className="h-9 w-20 rounded-button border border-ink-200 bg-warm-ivory px-2 text-right font-mono text-sm tabular-nums outline-none focus:border-antique-gold dark:border-ink-700 dark:bg-ink-800"
+                    />
+                    <button
+                      onClick={() => void save(g.kind, row.id, draft ?? row.price, row.name)}
+                      disabled={!dirty || saving === row.id}
+                      className="min-h-9 rounded-button bg-obsidian px-3 text-xs font-bold text-warm-ivory transition-colors hover:bg-ink-700 disabled:opacity-40 dark:bg-antique-gold dark:text-obsidian"
+                    >
+                      {saving === row.id ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
