@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import type { Behavior, PointTransaction, Redemption, RewardCurrency, Student, TransactionType } from "@/types";
 import type { CurrencyConfig, QuizStatus, QuizSummary, Reward } from "@/types";
 import type { QuizQuestionDraft } from "@/lib/storage";
@@ -119,6 +120,35 @@ export function useStore() {
     void refresh(activeClassId);
     void refreshQuizzes();
   }, [refresh, refreshQuizzes, activeClassId]);
+
+  // Live roster: when a student buys/equips an avatar or name style (or is
+  // added elsewhere), the `students` table changes and the console refetches
+  // the roster — no manual refresh needed. Debounced so a burst of events
+  // costs one query. Requires the students table in the realtime
+  // publication (migration 20261104110000); without it this is inert.
+  useEffect(() => {
+    let timer: number | null = null;
+    const channel = supabase
+      .channel("teacher-students")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "students" },
+        () => {
+          if (timer) window.clearTimeout(timer);
+          timer = window.setTimeout(() => {
+            storage
+              .getStudents(activeClassId)
+              .then(setStudents)
+              .catch(() => undefined);
+          }, 600);
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [activeClassId]);
 
   const run = useCallback(
     async (fn: () => Promise<void>) => {

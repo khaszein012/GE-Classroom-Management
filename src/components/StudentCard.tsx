@@ -1,5 +1,6 @@
 import { Check, Minus, Plus } from "lucide-react";
 import { Monogram } from "@/components/Monogram";
+import { Nameplate } from "@/components/Nameplate";
 import { useCountUp } from "@/lib/useCountUp";
 import { CurrencyAmount } from "@/components/CurrencyAmount";
 import { levelProgress } from "@/lib/levels";
@@ -8,6 +9,8 @@ interface Props {
   colorIndex: number;
   /** Premium avatar id; null/absent keeps the classic colour monogram. */
   avatarId?: string | null;
+  /** Premium name style id; null/absent keeps the plain name. */
+  nameBgId?: string | null;
   name: string;
   total: number;
   lifetime: number;
@@ -21,6 +24,7 @@ interface Props {
 export function StudentCard({
   colorIndex,
   avatarId,
+  nameBgId,
   name,
   total,
   lifetime,
@@ -63,9 +67,12 @@ export function StudentCard({
 
       {/* Name + total + level progress */}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px] font-medium text-ink-800 dark:text-ink-100">
-          {name}
-        </div>
+        <Nameplate
+          name={name}
+          bgId={nameBgId}
+          className="text-[15px] font-medium"
+          plainClass="text-ink-800 dark:text-ink-100"
+        />
         <div className="mt-1">
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${pillClass}`}

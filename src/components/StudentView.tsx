@@ -6,7 +6,7 @@ import type { StudentSafeRow } from "@/lib/storage";
 import { useCountUp } from "@/lib/useCountUp";
 import { Monogram } from "@/components/Monogram";
 import { AvatarWardrobe } from "@/components/student/AvatarWardrobe";
-import { nameBgById } from "@/lib/nameBackgrounds";
+import { Nameplate } from "@/components/Nameplate";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { Skeleton } from "@/components/Skeleton";
 import { buildActivityGroups, buildTrend } from "@/components/student/activity";
@@ -503,25 +503,14 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              {(() => {
-                const nameBg = nameBgById(row.equipped_name_bg ?? "none");
-                const base =
-                  "block max-w-[140px] truncate text-[15px] font-bold leading-tight sm:max-w-[220px]";
-                // "none" (free) renders the plain name — identical to the
-                // pre-cosmetic look, so nobody's name got worse.
-                return nameBg.plate ? (
-                  <h1
-                    className={`${base} relative rounded-full px-3 py-0.5 ${nameBg.plate} ${nameBg.text}`}
-                  >
-                    {nameBg.flourish && (
-                      <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${nameBg.flourish}`} />
-                    )}
-                    <span className="relative">{row.display_name}</span>
-                  </h1>
-                ) : (
-                  <h1 className={`${base} text-ink-900 dark:text-warm-ivory`}>{row.display_name}</h1>
-                );
-              })()}
+              <h1 className="max-w-[140px] leading-tight sm:max-w-[220px]">
+                <Nameplate
+                  name={row.display_name}
+                  bgId={row.equipped_name_bg ?? "none"}
+                  className="text-[15px] font-bold"
+                  plainClass="text-ink-900 dark:text-warm-ivory"
+                />
+              </h1>
               <span
                 className="shrink-0 rounded-full bg-ivory-dim px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums text-deep-gold dark:bg-antique-gold/15 dark:text-antique-gold"
                 title="Your level — grows as you earn"

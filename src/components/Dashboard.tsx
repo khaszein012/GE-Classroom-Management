@@ -309,6 +309,7 @@ export function Dashboard({ store, onGoToStudents, onGoToSettings }: Props) {
                   key={s.id}
                   colorIndex={index}
                   avatarId={s.equippedAvatar}
+                  nameBgId={s.equippedNameBg}
                   name={s.displayName}
                   total={totals[s.id] ?? 0}
                   lifetime={store.lifetime[s.id] ?? 0}

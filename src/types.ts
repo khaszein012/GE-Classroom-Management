@@ -7,6 +7,8 @@ export interface Student {
   avatarColor: number;
   /** Premium avatar style id (null = the classic colour monogram). */
   equippedAvatar: string | null;
+  /** Premium name style id (null = the plain name). */
+  equippedNameBg: string | null;
   username: string | null;
   hasPin: boolean;
   isActive: boolean;

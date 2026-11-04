@@ -54,6 +54,7 @@ function rowToStudent(r: StudentRow): Student {
     avatarEmoji: r.avatar_emoji,
     avatarColor: r.avatar_color,
     equippedAvatar: r.equipped_avatar ?? null,
+    equippedNameBg: r.equipped_name_bg ?? null,
     username: r.username,
     hasPin: r.pin_hash !== null,
     isActive: r.is_active,

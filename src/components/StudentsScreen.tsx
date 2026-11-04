@@ -7,6 +7,7 @@ import { PinDialog } from "@/components/PinDialog";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Skeleton } from "@/components/Skeleton";
 import { Monogram } from "@/components/Monogram";
+import { Nameplate } from "@/components/Nameplate";
 import { nextColorIndex } from "@/lib/avatarColor";
 import { ColorPicker } from "@/components/Modal";
 import { useCurrency } from "@/components/CurrencyProvider";
@@ -251,9 +252,12 @@ export function StudentsScreen({ store, onPrintCards }: Props) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="truncate text-[15px] font-medium text-ink-900 dark:text-ink-100">
-                            {s.displayName}
-                          </span>
+                          <Nameplate
+                            name={s.displayName}
+                            bgId={s.equippedNameBg}
+                            className="max-w-[180px] text-[15px] font-medium"
+                            plainClass="text-ink-900 dark:text-ink-100"
+                          />
                           <span
                             className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums text-ink-600 dark:bg-ink-800 dark:text-ink-300"
                             title={`Level ${level} (lifetime earned)`}
