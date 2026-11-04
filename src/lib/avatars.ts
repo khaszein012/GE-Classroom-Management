@@ -1,18 +1,22 @@
 /**
  * Premium avatar catalog.
  *
- * Design constraint: these must NOT break the monogram recognition system.
- * A teacher scanning the roster should still be able to tell students apart,
- * so every premium avatar keeps the initials visible and keeps a distinct
- * background — it changes the *treatment* (gradient, glyph frame, pattern),
- * not the person's identity.
+ * REDESIGN (2026-11-05): the first pass put a tiny glyph in the tile's
+ * bottom-right corner — exactly where the level badge sits — and used muted
+ * gradients, so premium avatars were nearly indistinguishable from free
+ * ones. The redesign makes the glyph the MAIN artwork (large, centered) and
+ * moves the initials to a small chip in the TOP-LEFT corner, opposite the
+ * level badge. Initials stay visible (recognition rule), but the emoji is
+ * what you see across the room.
  *
- * v1 is a closed catalog: no uploads. Curated packs are mod-safe for a
- * school app and stay on brand. Adding an avatar = one entry here plus the
- * same id in the migration's seed (ids are stable strings stored in the DB).
+ * Free tier stays the classic colour monogram — that is the recognition
+ * baseline and is never restyled.
+ *
+ * v2 is still a closed catalog: no uploads. Adding an avatar = one entry
+ * here plus the same id in the migration seed (ids are stable strings).
  */
 
-export type AvatarRarity = "free" | "uncommon" | "rare";
+export type AvatarRarity = "free" | "uncommon" | "rare" | "epic";
 
 export interface AvatarDef {
   id: string;
@@ -20,15 +24,13 @@ export interface AvatarDef {
   rarity: AvatarRarity;
   /** Gem price. Free-tier avatars are never sold. */
   price: number;
-  /** Gradient/background classes for the tile. */
+  /** Background scene classes for the tile. */
   bg: string;
-  /** Text colour for the initials. */
-  text: string;
   /** Ring/outline class. */
   ring: string;
-  /** Optional decorative glyph rendered behind the initials. */
-  glyph?: string;
-  /** Extra flourish layer class (patterns, shine). */
+  /** The dominant emoji artwork, centered on the tile. */
+  glyph: string;
+  /** Extra flourish layer class (sheen/pattern) for top tiers. */
   flourish?: string;
 }
 
@@ -42,84 +44,76 @@ export const AVATARS: readonly AvatarDef[] = [
     rarity: "free",
     price: 0,
     bg: "",
-    text: "",
     ring: "",
+    glyph: "",
   },
 
-  // ----- Uncommon: richer treatments, same initials-forward idea -----------
+  // ----- Uncommon (15 gems): vivid animal/nature scenes --------------------
   {
     id: "ink-scholar",
-    name: "Ink Scholar",
+    name: "Wise Owl",
     rarity: "uncommon",
     price: 15,
-    bg: "bg-gradient-to-br from-[#22304a] to-[#0b1220]",
-    text: "text-[#e8d8a8]",
-    ring: "ring-[#c9a227]/40",
-    glyph: "✦",
+    bg: "bg-gradient-to-br from-[#4c3a8f] via-[#372a6b] to-[#181233]",
+    ring: "ring-[#b9a5ff]/60",
+    glyph: "🦉",
   },
   {
     id: "sea-glass",
-    name: "Sea Glass",
+    name: "Ocean Wave",
     rarity: "uncommon",
     price: 15,
-    bg: "bg-gradient-to-br from-[#1f5f5b] to-[#08302f]",
-    text: "text-[#d8f5ef]",
-    ring: "ring-[#7fd8c8]/40",
-    glyph: "◇",
+    bg: "bg-gradient-to-br from-[#0e7490] via-[#0e5a75] to-[#062c3d]",
+    ring: "ring-[#67e8f9]/60",
+    glyph: "🐬",
   },
   {
     id: "ember",
-    name: "Ember",
+    name: "Butterfly",
     rarity: "uncommon",
     price: 15,
-    bg: "bg-gradient-to-br from-[#7a3410] to-[#2a1005]",
-    text: "text-[#ffd9b3]",
-    ring: "ring-[#ff9f45]/40",
-    glyph: "▲",
+    bg: "bg-gradient-to-br from-[#db2777] via-[#9d174d] to-[#4a0521]",
+    ring: "ring-[#f9a8d4]/60",
+    glyph: "🦋",
   },
   {
     id: "orchid",
-    name: "Orchid",
+    name: "Blossom",
     rarity: "uncommon",
     price: 15,
-    bg: "bg-gradient-to-br from-[#5b2a5e] to-[#1f0d24]",
-    text: "text-[#f0d4f5]",
-    ring: "ring-[#d69ae0]/40",
-    glyph: "❋",
+    bg: "bg-gradient-to-br from-[#c026d3] via-[#86198f] to-[#3b0764]",
+    ring: "ring-[#f0abfc]/60",
+    glyph: "🌸",
   },
 
-  // ----- Rare: gilded/gem-set treatments ----------------------------------
+  // ----- Rare (45-60 gems): bold statement scenes --------------------------
   {
     id: "gilded-crown",
-    name: "Gilded Crown",
+    name: "Golden Crown",
     rarity: "rare",
     price: 45,
-    bg: "bg-gradient-to-br from-[#4a3a12] via-[#8a6a1f] to-[#2a1f08]",
-    text: "text-[#fff3c4]",
-    ring: "ring-[#f2cf5b]/70",
-    glyph: "♛",
+    bg: "bg-gradient-to-br from-[#f59e0b] via-[#b45309] to-[#451a03]",
+    ring: "ring-[#fcd34d]/80",
+    glyph: "👑",
     flourish: "avatar-foil",
   },
   {
     id: "midnight-star",
-    name: "Midnight Star",
+    name: "Midnight Moon",
     rarity: "rare",
     price: 45,
-    bg: "bg-gradient-to-br from-[#241a4d] via-[#3a2a7a] to-[#0b0720]",
-    text: "text-[#e3dcff]",
-    ring: "ring-[#a99bff]/60",
-    glyph: "★",
-    flourish: "avatar-foil",
+    bg: "bg-gradient-to-br from-[#1e3a8a] via-[#172554] to-[#020617]",
+    ring: "ring-[#93c5fd]/60",
+    glyph: "🌙",
   },
   {
     id: "jade-dragon",
     name: "Jade Dragon",
     rarity: "rare",
     price: 60,
-    bg: "bg-gradient-to-br from-[#123a2a] via-[#1f6b47] to-[#06170f]",
-    text: "text-[#d6ffe8]",
-    ring: "ring-[#5ce0a0]/60",
-    glyph: "龍",
+    bg: "bg-gradient-to-br from-[#059669] via-[#065f46] to-[#022c22]",
+    ring: "ring-[#6ee7b7]/70",
+    glyph: "🐉",
     flourish: "avatar-foil",
   },
   {
@@ -127,10 +121,31 @@ export const AVATARS: readonly AvatarDef[] = [
     name: "Solar Flare",
     rarity: "rare",
     price: 60,
-    bg: "bg-gradient-to-br from-[#7a2f0b] via-[#c2571a] to-[#3a1303]",
-    text: "text-[#fff0d4]",
-    ring: "ring-[#ffb35c]/70",
-    glyph: "☀",
+    bg: "bg-gradient-to-br from-[#fb923c] via-[#ea580c] to-[#7c2d12]",
+    ring: "ring-[#fed7aa]/70",
+    glyph: "☀️",
+    flourish: "avatar-foil",
+  },
+
+  // ----- Epic (80 gems): the top of the ladder ------------------------------
+  {
+    id: "aurora",
+    name: "Aurora",
+    rarity: "epic",
+    price: 80,
+    bg: "bg-gradient-to-br from-[#22d3ee] via-[#a855f7] to-[#ec4899]",
+    ring: "ring-white/70",
+    glyph: "🌈",
+    flourish: "avatar-foil",
+  },
+  {
+    id: "nebula",
+    name: "Nebula",
+    rarity: "epic",
+    price: 80,
+    bg: "bg-gradient-to-br from-[#6d28d9] via-[#312e81] to-[#0c0a1d]",
+    ring: "ring-[#c4b5fd]/70",
+    glyph: "🪐",
     flourish: "avatar-foil",
   },
 ];
@@ -151,4 +166,5 @@ export const RARITY_LABEL: Record<AvatarRarity, string> = {
   free: "Starter",
   uncommon: "Uncommon",
   rare: "Rare",
+  epic: "Epic",
 };

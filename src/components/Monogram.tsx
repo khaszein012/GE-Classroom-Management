@@ -11,13 +11,22 @@ const SIZE_CLASSES: Record<Size, string> = {
   xl: "h-20 w-20 text-2xl",
 };
 
-/** Glyph scales with the tile so it never collides with the initials. */
+/** Glyph scales with the tile — it is the main artwork on premium avatars. */
 const GLYPH_CLASSES: Record<Size, string> = {
-  xs: "text-[9px]",
-  sm: "text-[11px]",
-  md: "text-[13px]",
-  lg: "text-[15px]",
-  xl: "text-[26px]",
+  xs: "text-[15px]",
+  sm: "text-[20px]",
+  md: "text-[26px]",
+  lg: "text-[30px]",
+  xl: "text-[44px]",
+};
+
+/** Initials chip: top-LEFT, opposite the level badge (bottom-right). */
+const CHIP_CLASSES: Record<Size, string> = {
+  xs: "left-[1px] top-[1px] px-[3px] text-[6px]",
+  sm: "left-[2px] top-[2px] px-1 text-[7px]",
+  md: "left-[2px] top-[2px] px-1 text-[8px]",
+  lg: "left-[3px] top-[3px] px-1 text-[9px]",
+  xl: "left-1 top-1 px-1.5 text-[11px]",
 };
 
 const DOT_CLASSES: Record<Size, string> = {
@@ -34,9 +43,9 @@ const DOT_CLASSES: Record<Size, string> = {
  * Two modes:
  *  - default: the classic monogram, coloured from AVATAR_PALETTE by index
  *    (this is the recognition system — teacher-assigned and student-picked).
- *  - premium: a designed style from the avatar catalog. Initials stay
- *    visible and a small glyph sits in the corner, so the roster stays
- *    scannable even when everyone has bought something shiny.
+ *  - premium: the emoji is the main artwork, centered and large; the
+ *    initials sit in a small chip in the TOP-LEFT corner so they never
+ *    collide with the level badge (which overlays the bottom-right).
  */
 export function Monogram({
   name,
@@ -59,21 +68,20 @@ export function Monogram({
   if (premium) {
     return (
       <div
-        className={`monogram relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold tracking-tight ${premium.bg} ${premium.text} ${SIZE_CLASSES[size]} ${className} ${ring} ring-1 ${premium.ring}`}
+        className={`monogram relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold tracking-tight ${premium.bg} ${SIZE_CLASSES[size]} ${className} ${ring} ring-2 ${premium.ring}`}
         data-avatar={premium.id}
       >
-        <span className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-        <span className="absolute left-0 right-0 top-0 h-1/2 bg-gradient-to-b from-white/15 to-transparent" />
+        <span className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
         {premium.flourish && <span className={`absolute inset-0 ${premium.flourish}`} />}
-        <span className="relative">{init}</span>
-        {premium.glyph && (
-          <span
-            aria-hidden
-            className={`absolute bottom-0 right-1 leading-none opacity-60 ${GLYPH_CLASSES[size]}`}
-          >
-            {premium.glyph}
-          </span>
-        )}
+        <span aria-hidden className={`relative select-none leading-none ${GLYPH_CLASSES[size]}`}>
+          {premium.glyph}
+        </span>
+        <span
+          aria-hidden
+          className={`absolute rounded-full bg-white/90 font-bold text-ink-900 ring-1 ring-black/10 ${CHIP_CLASSES[size]}`}
+        >
+          {init}
+        </span>
       </div>
     );
   }
