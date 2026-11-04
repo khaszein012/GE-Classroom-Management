@@ -3,6 +3,7 @@ import type { ColorTheme } from "@/lib/themes";
 import { isColorTheme } from "@/lib/themes";
 import { supabase } from "@/lib/supabase";
 import { hashPin } from "@/lib/pin";
+import { fetchAllPaged } from "@/lib/paging";
 
 /**
  * Storage layer — all data access lives here. Backed by Supabase.
@@ -166,12 +167,30 @@ export async function updateStudent(
   id: string,
   patch: Partial<Pick<Student, "displayName" | "avatarColor" | "username">>,
 ): Promise<void> {
-  const values: Record<string, unknown> = {};
-  if (patch.displayName !== undefined) values.display_name = patch.displayName.trim();
-  if (patch.avatarColor !== undefined) values.avatar_color = patch.avatarColor;
-  if (patch.username !== undefined) values.username = patch.username;
-  const { error } = await supabase.from("students").update(values).eq("id", id);
-  if (error) throw error;
+  // Teacher edits go through a SECURITY DEFINER RPC, not a direct UPDATE.
+  // display_name/username are deliberately NOT in the authenticated role's
+  // column grant (a student shares that role and must never rename
+  // themselves), so a plain .update() is rejected by Postgres. The RPC
+  // checks the teacher claim server-side and writes on the caller's behalf.
+  //
+  // Unspecified fields are passed as null and the RPC keeps the current value
+  // for the name/username only when omitted — so fetch-then-send is avoided
+  // by always sending what the caller means.
+  const { data: current, error: readErr } = await supabase
+    .from("students")
+    .select("display_name, username, avatar_color")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new Error(readErr.message);
+  if (!current) throw new Error("Student not found");
+
+  const { error } = await supabase.rpc("update_student", {
+    p_id: id,
+    p_display_name: patch.displayName !== undefined ? patch.displayName.trim() : current.display_name,
+    p_username: patch.username !== undefined ? patch.username : current.username,
+    p_avatar_color: patch.avatarColor !== undefined ? patch.avatarColor : current.avatar_color,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function setStudentPin(id: string, pin: string): Promise<void> {
@@ -236,13 +255,19 @@ export async function deleteBehavior(id: string): Promise<void> {
 // ---------- Transactions ----------
 
 export async function getTransactions(classId: number): Promise<PointTransaction[]> {
-  const { data, error } = await supabase
-    .from("point_transactions")
-    .select("*")
-    .eq("class_id", classId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data as TransactionRow[]).map(rowToTransaction);
+  // Paged: the whole class ledger feeds every balance, lifetime total,
+  // class-goal figure and Insights panel. A truncated read would show
+  // wrong numbers with no error at all.
+  const rows = await fetchAllPaged<TransactionRow>((from, to) =>
+    supabase
+      .from("point_transactions")
+      .select("*")
+      .eq("class_id", classId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  return rows.map(rowToTransaction);
 }
 
 export async function addTransactions(
@@ -364,7 +389,9 @@ export async function getMyAchievementStats(): Promise<{
   quizzes_taken: number;
   perfect_quizzes: number;
   rewards_redeemed: number;
-  award_days: string[];
+  award_times: string[];
+  /** Legacy UTC dates, emitted by the pre-20261031150000 RPC. */
+  award_days?: string[];
 }> {
   const { data, error } = await supabase.rpc("my_achievement_stats");
   if (error) throw new Error(error.message);
@@ -374,6 +401,7 @@ export async function getMyAchievementStats(): Promise<{
     quizzes_taken: number;
     perfect_quizzes: number;
     rewards_redeemed: number;
+    award_times: string[] | null;
     award_days: string[] | null;
   };
   return {
@@ -382,6 +410,10 @@ export async function getMyAchievementStats(): Promise<{
     quizzes_taken: r.quizzes_taken ?? 0,
     perfect_quizzes: r.perfect_quizzes ?? 0,
     rewards_redeemed: r.rewards_redeemed ?? 0,
+    // award_times (raw timestamps) lets the client bucket days locally;
+    // award_days is the older UTC-date form, kept so the app still works
+    // before the 20261031150000 migration is applied.
+    award_times: r.award_times ?? [],
     award_days: r.award_days ?? [],
   };
 }
@@ -650,13 +682,16 @@ function rowToRedemption(r: RedemptionRow): Redemption {
   };
 }
 export async function getRedemptions(classId: number): Promise<Redemption[]> {
-  const { data, error } = await supabase
-    .from("redemptions")
-    .select("*, rewards!inner(name, class_id)")
-    .eq("rewards.class_id", classId)
-    .order("requested_at", { ascending: false });
-  if (error) throw error;
-  return (data as RedemptionRow[]).map(rowToRedemption);
+  const rows = await fetchAllPaged<RedemptionRow>((from, to) =>
+    supabase
+      .from("redemptions")
+      .select("*, rewards!inner(name, class_id)")
+      .eq("rewards.class_id", classId)
+      .order("requested_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to),
+  );
+  return rows.map(rowToRedemption);
 }
 // Server-side decisions. The RPC raises with a message on any failed check;
 // surface the message so the teacher sees why nothing was approved.
@@ -775,31 +810,55 @@ function rowToQuiz(r: QuizRow): Quiz {
 }
 
 export async function getQuizzes(classId: number): Promise<QuizSummary[]> {
-  const [quizRes, questionRes, assignmentRes, attemptRes] = await Promise.all([
-    supabase.from("quizzes").select("*").eq("class_id", classId).order("due_at", { ascending: true }),
-    supabase.from("quiz_questions").select("quiz_id"),
-    supabase.from("quiz_assignments").select("quiz_id"),
-    supabase.from("quiz_attempts").select("quiz_id, submitted_at"),
+  // Count queries page too: a busy class can accumulate >1000 attempts,
+  // which would silently under-count "started"/"submitted".
+  const [quizRows, questionRows, assignmentRows, attemptRows] = await Promise.all([
+    fetchAllPaged<QuizRow>((from, to) =>
+      supabase
+        .from("quizzes")
+        .select("*")
+        .eq("class_id", classId)
+        .order("due_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllPaged<{ quiz_id: string }>((from, to) =>
+      supabase
+        .from("quiz_questions")
+        .select("quiz_id")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllPaged<{ quiz_id: string }>((from, to) =>
+      supabase
+        .from("quiz_assignments")
+        .select("quiz_id")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllPaged<{ quiz_id: string; submitted_at: string | null }>((from, to) =>
+      supabase
+        .from("quiz_attempts")
+        .select("quiz_id, submitted_at")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
   ]);
-  const qErr = quizRes.error ?? questionRes.error ?? assignmentRes.error ?? attemptRes.error;
-  if (qErr) throw qErr;
 
   const questionCounts = new Map<string, number>();
-  for (const r of (questionRes.data ?? []) as { quiz_id: string }[])
-    questionCounts.set(r.quiz_id, (questionCounts.get(r.quiz_id) ?? 0) + 1);
+  for (const r of questionRows) questionCounts.set(r.quiz_id, (questionCounts.get(r.quiz_id) ?? 0) + 1);
 
   const assignedCounts = new Map<string, number>();
-  for (const r of (assignmentRes.data ?? []) as { quiz_id: string }[])
-    assignedCounts.set(r.quiz_id, (assignedCounts.get(r.quiz_id) ?? 0) + 1);
+  for (const r of assignmentRows) assignedCounts.set(r.quiz_id, (assignedCounts.get(r.quiz_id) ?? 0) + 1);
 
   const startedCounts = new Map<string, number>();
   const submittedCounts = new Map<string, number>();
-  for (const r of (attemptRes.data ?? []) as { quiz_id: string; submitted_at: string | null }[]) {
+  for (const r of attemptRows) {
     startedCounts.set(r.quiz_id, (startedCounts.get(r.quiz_id) ?? 0) + 1);
     if (r.submitted_at) submittedCounts.set(r.quiz_id, (submittedCounts.get(r.quiz_id) ?? 0) + 1);
   }
 
-  return (quizRes.data as QuizRow[]).map((r) => ({
+  return quizRows.map((r) => ({
     ...rowToQuiz(r),
     questionCount: questionCounts.get(r.id) ?? 0,
     assignedCount: assignedCounts.get(r.id) ?? 0,

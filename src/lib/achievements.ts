@@ -25,16 +25,16 @@ export interface AchievementStats {
   quizzes_taken: number;
   perfect_quizzes: number;
   rewards_redeemed: number;
-  /** ISO dates (YYYY-MM-DD) with at least one positive behaviour award. */
+  /** Local-timezone ISO dates (YYYY-MM-DD) with at least one award. */
   award_days: string[];
   current_streak: number;
   longest_streak: number;
 }
 
-/** Consecutive-day streaks, bucketed in the viewer's local timezone. */
-function computeStreaks(awardDays: string[]): { current: number; longest: number } {
-  if (awardDays.length === 0) return { current: 0, longest: 0 };
-  const days = new Set(awardDays.map((d) => new Date(`${d}T00:00:00`).toDateString()));
+/** Consecutive-day streaks from a set of local calendar-day keys. */
+function streaksFromDays(dayKeys: string[]): { current: number; longest: number } {
+  if (dayKeys.length === 0) return { current: 0, longest: 0 };
+  const days = new Set(dayKeys);
   const dayKey = (ts: number) => {
     const d = new Date(ts);
     d.setHours(0, 0, 0, 0);
@@ -64,16 +64,50 @@ function computeStreaks(awardDays: string[]): { current: number; longest: number
   return { current, longest: Math.max(longest, current) };
 }
 
+/**
+ * Map award timestamps to the viewer's LOCAL calendar day.
+ *
+ * The RPC used to emit UTC dates; parsed as local midnight those shifted
+ * every award before the UTC offset onto the previous day (e.g. before
+ * 07:00 in UTC+7), breaking streaks. Bucketing raw timestamps here keeps
+ * the day boundary where the teacher and students actually live.
+ */
+function localDayKey(iso: string | number): string {
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return d.toDateString();
+}
+
+/** YYYY-MM-DD in local time, for display and persistence. */
+function toLocalIsoDate(dayKey: string): string {
+  const d = new Date(dayKey);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 export function buildAchievementStats(raw: {
   total_awards: number;
   lifetime_earned: number;
   quizzes_taken: number;
   perfect_quizzes: number;
   rewards_redeemed: number;
-  award_days: string[];
+  /** Preferred: raw award timestamps, bucketed locally. */
+  award_times?: string[];
+  /** Legacy UTC dates, used only before the 20261031150000 migration. */
+  award_days?: string[];
 }): AchievementStats {
-  const { current, longest } = computeStreaks(raw.award_days ?? []);
-  return { ...raw, award_days: raw.award_days ?? [], current_streak: current, longest_streak: longest };
+  const dayKeys = raw.award_times?.length
+    ? [...new Set(raw.award_times.map(localDayKey))]
+    : (raw.award_days ?? []).map((d) => localDayKey(`${d}T00:00:00`));
+
+  const { current, longest } = streaksFromDays(dayKeys);
+  return {
+    ...raw,
+    award_days: dayKeys.map(toLocalIsoDate).sort(),
+    current_streak: current,
+    longest_streak: longest,
+  };
 }
 
 export interface AchievementDef {

@@ -29,6 +29,9 @@ jobs:
       - name: CSV parser tests
         run: npm run test:csv
 
+      - name: Unit tests
+        run: npm run test:unit
+
       - name: Production build
         run: npm run build
 

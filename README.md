@@ -33,8 +33,9 @@ Requires **Node 20+**. The app expects a Supabase project with the schema below 
 | `npm run build` | Production build to `dist/` |
 | `npm run typecheck` | Strict TypeScript check |
 | `npm run lint` | ESLint |
-| `npm run test` | 60-assertion live security suite (needs teacher env creds) |
+| `npm run test` | Live security suite (needs teacher env creds) |
 | `npm run test:csv` | CSV parser unit tests (no credentials needed) |
+| `npm run test:unit` | Paging + streak unit tests (no credentials needed) |
 | `npm run backup` | Export every table to `backups/<timestamp>/` as JSON |
 
 ## Database setup (Supabase)
@@ -59,8 +60,8 @@ The anon key is public by design; everything sensitive is enforced by Postgres R
 
 ## Testing & operations
 
-- **CI** runs typecheck, lint, CSV tests and a production build on every push; the live security suite runs once teacher credentials are added as repo secrets.
-- **Pre-push hook** (`hooks/`, wired via `git config core.hooksPath hooks`) runs the same checks locally before anything is pushed.
+- **CI** runs typecheck, lint, CSV tests, unit tests and a production build on every push; the live security suite runs once teacher credentials are added as repo secrets.
+- **Pre-push hook** (`hooks/`, wired via `git config core.hooksPath hooks`) runs typecheck, lint, CSV tests, unit tests and build locally before anything is pushed.
 - **Backups** run nightly via GitHub Actions (results kept 90 days as private artifacts) or on demand with `npm run backup`.
 
 ## Deployment

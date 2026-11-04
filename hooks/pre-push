@@ -8,6 +8,8 @@ echo "▶ lint"
 npm run --silent lint
 echo "▶ csv tests"
 npm run --silent test:csv
+echo "▶ unit tests"
+npm run --silent test:unit
 echo "▶ build"
 npm run --silent build >/dev/null
 echo "✓ pre-push checks passed"

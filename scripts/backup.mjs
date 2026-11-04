@@ -48,6 +48,9 @@ async function fetchAll(table, order = "created_at") {
 
 const TABLES = [
   "class_settings",
+  // Multi-class structure + per-class goals. Without this a restore loses
+  // the class list and every class goal.
+  "classes",
   "students",
   "behaviors",
   "point_transactions",
@@ -64,6 +67,7 @@ const TABLES = [
 // Each table's stable ordering column (they differ across the schema).
 const ORDER_BY = {
   class_settings: "id",
+  classes: "created_at",
   students: "created_at",
   behaviors: "created_at",
   point_transactions: "created_at",
