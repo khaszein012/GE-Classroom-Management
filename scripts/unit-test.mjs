@@ -11,7 +11,7 @@ import { fetchAllPaged } from "../src/lib/paging";
 import { buildAchievementStats } from "../src/lib/achievements";
 import { nameStateFor } from "../src/lib/nameplateState";
 import { AVATARS, mergeAvatarCatalog, DEFAULT_AVATAR_ID } from "../src/lib/avatars";
-import { NAME_BACKGROUNDS } from "../src/lib/nameBackgrounds";
+import { NAME_BACKGROUNDS, mergeNameBgCatalog } from "../src/lib/nameBackgrounds";
 
 let passed = 0;
 let failed = 0;
@@ -366,11 +366,77 @@ function testCatalogs() {
   }
 }
 
+function testNameStyles() {
+  console.log("\nname style catalog");
+
+  const legendary = NAME_BACKGROUNDS.filter((b) => b.rarity === "legendary");
+  const epic = NAME_BACKGROUNDS.filter((b) => b.rarity === "epic");
+  const epicMax = Math.max(...epic.map((b) => b.price));
+
+  ok("five legendary name styles", legendary.length === 5, legendary.length);
+  ok(
+    "every legendary costs more than the dearest epic name style",
+    legendary.every((b) => b.price > epicMax),
+    { epicMax, prices: legendary.map((b) => b.price) },
+  );
+  ok(
+    "legendary name prices are all 100+ gems",
+    legendary.every((b) => b.price >= 100),
+    legendary.map((b) => b.price),
+  );
+  ok(
+    "legendary name prices all differ (no two tie)",
+    new Set(legendary.map((b) => b.price)).size === legendary.length,
+  );
+
+  // The tier exists because colour alone stopped signalling rank; a pattern
+  // is what a student is actually paying for above Epic.
+  ok("every legendary name style has a pattern", legendary.every((b) => !!b.pattern));
+  ok(
+    "legendary patterns are distinct classes",
+    new Set(legendary.map((b) => b.pattern)).size === legendary.length,
+    legendary.map((b) => b.pattern),
+  );
+  ok(
+    "no non-legendary style has a pattern",
+    NAME_BACKGROUNDS.filter((b) => b.rarity !== "legendary").every((b) => !b.pattern),
+  );
+  // Patterned plates are busy by nature; the name must stay readable first.
+  ok("every legendary name style has a text shadow", legendary.every((b) => !!b.textShadow));
+
+  ok(
+    "every paid name style has plate classes",
+    NAME_BACKGROUNDS.filter((b) => b.price > 0).every((b) => !!b.plate),
+  );
+  ok(
+    "free style is plain (no plate, no pattern)",
+    NAME_BACKGROUNDS.filter((b) => b.rarity === "free").every((b) => !b.plate && !b.pattern),
+  );
+
+  // The DB overlay must drop unknown ids rather than render a broken plate.
+  const merged = mergeNameBgCatalog([
+    { id: "crownweave", name: "Renamed Weave", price: 333, sort_order: 0 },
+    { id: "ghost-style", name: "Ghost", price: 1, sort_order: 1 },
+  ]);
+  ok("unknown name-style ids are dropped", merged.length === 1, merged.length);
+  ok("db price wins for name styles", merged[0].price === 333, merged[0].price);
+  ok("artwork still comes from the client", merged[0].pattern === "name-pattern-weave", merged[0].pattern);
+
+  const fallback = mergeNameBgCatalog(null);
+  ok("null name catalog falls back to every style", fallback.length === NAME_BACKGROUNDS.length);
+  ok(
+    "fallback is sorted cheapest first",
+    fallback.every((b, i) => i === 0 || fallback[i - 1].price <= b.price),
+    fallback.map((b) => b.price),
+  );
+}
+
 async function main() {
   await testPaging();
   testStreaks();
   testPlateStates();
   testCatalogs();
+  testNameStyles();
   console.log(`\n${failed === 0 ? "ALL UNIT TESTS PASSED" : `${failed} TEST(S) FAILED`} — ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }

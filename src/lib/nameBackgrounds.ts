@@ -15,7 +15,7 @@
  * than it is today.
  */
 
-export type NameBgRarity = "free" | "uncommon" | "rare" | "epic";
+export type NameBgRarity = "free" | "uncommon" | "rare" | "epic" | "legendary";
 
 export interface NameBgDef {
   id: string;
@@ -29,6 +29,18 @@ export interface NameBgDef {
   text: string;
   /** Extra flourish layer (gold sheen) for the top tiers. */
   flourish?: string;
+  /**
+   * Legendary only: a CSS pattern class (defined in index.css) drawn over the
+   * plate. This is what separates the top tier — the seven styles below it are
+   * flat tint or gradient, so a pattern is visible at nameplate size from
+   * across a room. All patterns are static; see the note on animation below.
+   */
+  pattern?: string;
+  /**
+   * Shadow under the name text. Patterns are busy by nature, and the name has
+   * to stay readable first — legibility beats decoration on a projector.
+   */
+  textShadow?: string;
 }
 
 export const DEFAULT_NAME_BG_ID = "none";
@@ -122,6 +134,68 @@ export const NAME_BACKGROUNDS: readonly NameBgDef[] = [
     text: "text-[#e3dcff]",
     flourish: "avatar-foil",
   },
+
+  // ----- Legendary (100-200 gems): pattern, not just colour -----------------
+  // Everything below Epic is a flat tint or a smooth gradient, so at this
+  // tier colour alone can no longer signal rank. Each of these carries a
+  // real PATTERN layer instead (index.css), which is legible at nameplate
+  // size and takes the name away from sitting on a plain wash.
+  //
+  // All five patterns are static by design. The student's own nameplate can
+  // already animate an earned state (goal / streak), and a scrolling texture
+  // underneath a pulsing ring is two motions competing for one small box —
+  // unreadable on a projector. Pattern here, motion there, never both.
+  {
+    id: "starlit",
+    name: "Starlit",
+    rarity: "legendary",
+    price: 100,
+    plate: "bg-gradient-to-r from-[#0b1030] via-[#1b2459] to-[#0b1030] ring-1 ring-[#9fb6ff]/70",
+    text: "text-[#e8ecff]",
+    pattern: "name-pattern-stars",
+    textShadow: "0 1px 2px rgba(0,0,0,0.75)",
+  },
+  {
+    id: "dragonscale",
+    name: "Dragon Scale",
+    rarity: "legendary",
+    price: 120,
+    plate: "bg-gradient-to-r from-[#04302a] via-[#0b6b52] to-[#04302a] ring-1 ring-[#5eead4]/70",
+    text: "text-[#dcfff6]",
+    pattern: "name-pattern-scale",
+    textShadow: "0 1px 2px rgba(0,0,0,0.7)",
+  },
+  {
+    id: "hologram",
+    name: "Hologram",
+    rarity: "legendary",
+    price: 145,
+    plate: "bg-gradient-to-r from-[#1a0b2e] via-[#4c1d95] to-[#0e7490] ring-1 ring-[#67e8f9]/80",
+    text: "text-[#f0f9ff]",
+    pattern: "name-pattern-holo",
+    textShadow: "0 1px 2px rgba(0,0,0,0.68)",
+  },
+  {
+    id: "emberwing",
+    name: "Emberwing",
+    rarity: "legendary",
+    price: 170,
+    plate: "bg-gradient-to-r from-[#3f0d05] via-[#c2410c] to-[#3f0d05] ring-1 ring-[#fdba74]/80",
+    text: "text-[#fff1e6]",
+    pattern: "name-pattern-ember",
+    textShadow: "0 1px 2px rgba(0,0,0,0.75)",
+  },
+  {
+    id: "crownweave",
+    name: "Crown Weave",
+    rarity: "legendary",
+    price: 200,
+    plate: "bg-gradient-to-r from-[#241a4d] via-[#6d28d9] to-[#8a6a1f] ring-1 ring-[#fcd34d]/80",
+    text: "text-[#fff8e1]",
+    flourish: "avatar-foil",
+    pattern: "name-pattern-weave",
+    textShadow: "0 1px 2px rgba(0,0,0,0.78)",
+  },
 ];
 
 const BY_ID = new Map(NAME_BACKGROUNDS.map((b) => [b.id, b]));
@@ -158,4 +232,5 @@ export const NAME_BG_RARITY_LABEL: Record<NameBgRarity, string> = {
   uncommon: "Uncommon",
   rare: "Rare",
   epic: "Epic",
+  legendary: "Legendary",
 };

@@ -75,7 +75,15 @@ export function Nameplate({
           className={`absolute inset-0 overflow-hidden rounded-full ${animate ? "avatar-foil-live" : bg.flourish}`}
         />
       )}
-      <span className="relative">{name}</span>
+      {/* Legendary pattern layer. Sits above the flourish but below the name,
+          and is clipped by the plate's own rounded-full, so it can never spill
+          outside the pill. */}
+      {bg.pattern && (
+        <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${bg.pattern}`} />
+      )}
+      <span className="relative" style={bg.textShadow ? { textShadow: bg.textShadow } : undefined}>
+        {name}
+      </span>
     </span>
   );
 }
