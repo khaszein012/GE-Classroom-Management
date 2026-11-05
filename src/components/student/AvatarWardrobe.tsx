@@ -4,6 +4,7 @@ import { AVATAR_PALETTE, initialsOf } from "@/lib/avatarColor";
 import { RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
 import { NAME_BG_RARITY_LABEL, type NameBgDef } from "@/lib/nameBackgrounds";
 import { Monogram } from "@/components/Monogram";
+import { Nameplate } from "@/components/Nameplate";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 
 /**
@@ -160,18 +161,16 @@ export function AvatarWardrobe({
                             : "border-dashed border-ink-200 dark:border-ink-700"
                       } disabled:cursor-default`}
                     >
-                      {/* Preview: the actual nameplate treatment */}
+                      {/* Preview: the actual nameplate treatment. Animated for the
+                        same reason as the shop — it is what Epic sells. */}
                       <span className="min-w-0 flex-1 text-left">
-                        {b.plate ? (
-                          <span className={`relative inline-block max-w-[220px] truncate rounded-full px-3 py-0.5 text-sm font-bold ${b.plate} ${b.text}`}>
-                            {b.flourish && (
-                              <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${b.flourish}`} />
-                            )}
-                            <span className="relative">{name}</span>
-                          </span>
-                        ) : (
-                          <span className="text-sm font-bold text-ink-900 dark:text-warm-ivory">{name}</span>
-                        )}
+                        <Nameplate
+                          name={name}
+                          bgId={b.id}
+                          animate
+                          className="max-w-[220px] text-sm font-bold"
+                          plainClass="text-ink-900 dark:text-warm-ivory"
+                        />
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 dark:text-ink-500">

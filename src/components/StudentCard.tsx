@@ -70,6 +70,7 @@ export function StudentCard({
         <Nameplate
           name={name}
           bgId={nameBgId}
+          animate={false}
           className="text-[15px] font-medium"
           plainClass="text-ink-800 dark:text-ink-100"
         />

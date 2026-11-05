@@ -255,6 +255,7 @@ export function StudentsScreen({ store, onPrintCards }: Props) {
                           <Nameplate
                             name={s.displayName}
                             bgId={s.equippedNameBg}
+                            animate={false}
                             className="max-w-[180px] text-[15px] font-medium"
                             plainClass="text-ink-900 dark:text-ink-100"
                           />

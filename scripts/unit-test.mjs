@@ -9,6 +9,7 @@
  */
 import { fetchAllPaged } from "../src/lib/paging";
 import { buildAchievementStats } from "../src/lib/achievements";
+import { nameStateFor } from "../src/lib/nameplateState";
 
 let passed = 0;
 let failed = 0;
@@ -202,9 +203,89 @@ function testStreaks() {
   }
 }
 
+// ---------- nameStateFor ----------------------------------------------------
+
+function testPlateStates() {
+  console.log("\nnameStateFor");
+
+  ok("nothing at all → calm", nameStateFor({}).id === "calm");
+  ok("calm has no tooltip", nameStateFor({}).label === "", nameStateFor({}).label);
+
+  // Goal reached, personal.
+  ok(
+    "personal goal met → goal",
+    nameStateFor({ goalTarget: 100, goalBalance: 100 }).id === "goal",
+  );
+  ok(
+    "personal goal exceeded → goal",
+    nameStateFor({ goalTarget: 100, goalBalance: 137 }).id === "goal",
+  );
+  ok(
+    "personal goal unmet → not goal",
+    nameStateFor({ goalTarget: 100, goalBalance: 99 }).id !== "goal",
+  );
+
+  // Class goal reaches the whole class, so it outranks a personal streak.
+  ok(
+    "class goal met → goal",
+    nameStateFor({ classGoalTarget: 500, classGoalEarned: 500 }).id === "goal",
+  );
+  ok(
+    "class goal beats streak",
+    nameStateFor({ classGoalTarget: 500, classGoalEarned: 600, currentStreak: 9 }).id === "goal",
+  );
+
+  // Streak: the threshold matches the "Warming Up" badge.
+  ok("streak 3 → streak", nameStateFor({ currentStreak: 3 }).id === "streak");
+  ok("streak 7 → streak", nameStateFor({ currentStreak: 7 }).id === "streak");
+  ok("streak 2 → calm", nameStateFor({ currentStreak: 2 }).id === "calm");
+
+  // "Close" only applies to a real goal that isn't met yet.
+  ok(
+    "80% of goal → close",
+    nameStateFor({ goalTarget: 100, goalBalance: 80 }).id === "close",
+  );
+  ok(
+    "79% of goal → calm",
+    nameStateFor({ goalTarget: 100, goalBalance: 79 }).id === "calm",
+  );
+  ok("no goal → never close", nameStateFor({ goalBalance: 9999 }).id === "calm");
+
+  // Malformed / stale data must never produce a phantom state.
+  ok("goal target 0 → calm", nameStateFor({ goalTarget: 0, goalBalance: 5 }).id === "calm");
+  ok(
+    "negative balance with a goal → calm, never a negative state",
+    nameStateFor({ goalTarget: 50, goalBalance: -20 }).id === "calm",
+  );
+  ok(
+    "negative balance with no goal → calm",
+    nameStateFor({ goalBalance: -20, currentStreak: 0 }).id === "calm",
+  );
+  ok(
+    "negative class earned never reaches a goal",
+    nameStateFor({ classGoalTarget: 100, classGoalEarned: -40 }).id === "calm",
+  );
+
+  // Priority order, end to end: goal > streak > close.
+  ok(
+    "goal outranks streak and close",
+    nameStateFor({ goalTarget: 100, goalBalance: 100, currentStreak: 9 }).id === "goal",
+  );
+  ok(
+    "streak outranks close",
+    nameStateFor({ goalTarget: 100, goalBalance: 90, currentStreak: 4 }).id === "streak",
+  );
+
+  // Every state carries a usable tooltip except calm.
+  ok("goal has a label", nameStateFor({ goalTarget: 1, goalBalance: 1 }).label.length > 0);
+  ok("streak has a label", nameStateFor({ currentStreak: 5 }).label.length > 0);
+  ok("close has a label", nameStateFor({ goalTarget: 100, goalBalance: 85 }).label.length > 0);
+}
+
 async function main() {
   await testPaging();
   testStreaks();
+  testPlateStates();
   console.log(`\n${failed === 0 ? "ALL UNIT TESTS PASSED" : `${failed} TEST(S) FAILED`} — ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }

@@ -951,7 +951,9 @@ export function PremiumStylesSection() {
       title: "Name styles",
       kind: "name",
       rows: nameRows,
-      render: (row) => <Nameplate name="Student" bgId={row.id} className="text-sm font-bold" />,
+      // Animated on purpose: the sweeping sheen is the Epic tier's whole
+      // selling point, so the preview has to show it moving.
+      render: (row) => <Nameplate name="Student" bgId={row.id} animate className="text-sm font-bold" />,
     },
   ];
 

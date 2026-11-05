@@ -178,6 +178,63 @@
     transparent 58% 100%
   );
 }
+
+/* The animated twin of the sheen above: the same band, sliding slowly across
+   a wide background so only the highlight travels.
+
+   These keyframes live here rather than in tailwind.config.js on purpose.
+   Config keyframes are only emitted when the matching `animate-*` utility is
+   used somewhere, and that is exactly how the confetti silently stopped
+   animating for months. Raw CSS in this file is always emitted. */
+@keyframes foil-sweep {
+  0% { background-position: 150% 0; }
+  60%, 100% { background-position: -60% 0; }
+}
+.avatar-foil-live {
+  background-image: linear-gradient(
+    115deg,
+    transparent 0 40%,
+    rgb(255 240 200 / 0.55) 50%,
+    transparent 60% 100%
+  );
+  background-size: 260% 100%;
+  animation: foil-sweep 4.5s ease-in-out infinite;
+}
+
+/* ===== Earned nameplate states ============================================
+   Driven by data-name-state (src/lib/nameplateState.ts).
+
+   Each state has TWO layers, and the split matters: a static ring that is
+   always visible, and an animation that only varies it. The static layer is
+   what a reduced-motion student sees (the global rule below kills every
+   animation), so a state must never be conveyed by motion alone — otherwise
+   those students would see nothing at all.
+
+   All of it is box-shadow only. Nothing moves, resizes or reflows, so a
+   nameplate never twitches while a class is looking at it. */
+@keyframes plate-goal {
+  0%, 100% { box-shadow: 0 0 0 2px rgb(var(--c-antique-gold) / 0.9), 0 0 0 0 rgb(var(--c-antique-gold) / 0.5); }
+  55% { box-shadow: 0 0 0 2px rgb(var(--c-antique-gold) / 0.9), 0 0 0 7px rgb(var(--c-antique-gold) / 0); }
+}
+@keyframes plate-flame {
+  0%, 100% { box-shadow: 0 0 0 2px rgb(251 146 60 / 0.85), 0 0 8px 1px rgb(251 146 60 / 0.3); }
+  50% { box-shadow: 0 0 0 2px rgb(251 146 60 / 1), 0 0 15px 3px rgb(251 146 60 / 0.55); }
+}
+@keyframes plate-close {
+  0%, 100% { box-shadow: 0 0 0 1px rgb(var(--c-antique-gold) / 0.45); }
+  50% { box-shadow: 0 0 0 1.5px rgb(var(--c-antique-gold) / 0.8); }
+}
+
+/* Static ring = the reduced-motion fallback. */
+[data-name-state="goal"] { box-shadow: 0 0 0 2px rgb(var(--c-antique-gold) / 0.9); }
+[data-name-state="streak"] { box-shadow: 0 0 0 2px rgb(251 146 60 / 0.85), 0 0 8px 1px rgb(251 146 60 / 0.3); }
+[data-name-state="close"] { box-shadow: 0 0 0 1px rgb(var(--c-antique-gold) / 0.45); }
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-name-state="goal"] { animation: plate-goal 2.1s ease-out infinite; }
+  [data-name-state="streak"] { animation: plate-flame 1.9s ease-in-out infinite; }
+  [data-name-state="close"] { animation: plate-close 2.6s ease-in-out infinite; }
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 * { scrollbar-width: thin; scrollbar-color: rgb(var(--c-ink-300)) transparent; }
 .dark * { scrollbar-color: rgb(var(--c-ink-600)) transparent; }

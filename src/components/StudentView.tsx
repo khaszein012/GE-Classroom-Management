@@ -26,6 +26,7 @@ import { levelProgress, levelForXp } from "@/lib/levels";
 import { Confetti } from "@/components/student/Confetti";
 import { getClassGoalProgress, getMyAchievementStats, type ClassGoalProgress } from "@/lib/storage";
 import { buildAchievementStats, type AchievementStats } from "@/lib/achievements";
+import { nameStateFor } from "@/lib/nameplateState";
 import { AchievementsCard } from "@/components/student/AchievementsCard";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import type { CurrencySettings, PointTransaction } from "@/types";
@@ -300,6 +301,23 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
     currency: row?.goal_currency ?? null,
   };
 
+  // The nameplate's earned state. Derived entirely from what the dashboard
+  // already holds — the personal goal counts against whichever currency it
+  // targets, so a gem goal and a tickets goal both read correctly.
+  const plateState = {
+    goalTarget: goal.target,
+    goalBalance:
+      goal.target === null
+        ? 0
+        : (goal.currency ?? "dollars") === "gems"
+          ? (row?.gems_balance ?? 0)
+          : (row?.balance ?? 0),
+    classGoalTarget: classGoal?.target ?? null,
+    classGoalEarned: classGoal?.earned ?? 0,
+    currentStreak: achvStats?.current_streak ?? 0,
+  };
+  const plateStateNow = nameStateFor(plateState);
+
   const saveGoal = useCallback(
     async (next: Goal | { target: null; label: null; currency: null }) => {
       setSavingGoal(true);
@@ -525,6 +543,9 @@ export function StudentView({ onSignOut }: { onSignOut: () => void }) {
                 <Nameplate
                   name={row.display_name}
                   bgId={row.equipped_name_bg ?? "none"}
+                  state={plateStateNow.id}
+                  animate
+                  title={plateStateNow.label || undefined}
                   className="text-[15px] font-bold"
                   plainClass="text-ink-900 dark:text-warm-ivory"
                 />

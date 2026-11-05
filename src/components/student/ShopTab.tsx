@@ -7,6 +7,7 @@ import { relativeTime } from "@/lib/time";
 import { CurrencyIcon } from "@/components/CurrencyAmount";
 import { RewardThumbnail } from "@/components/RewardThumbnail";
 import { Monogram } from "@/components/Monogram";
+import { Nameplate } from "@/components/Nameplate";
 import { RARITY_LABEL, type AvatarDef } from "@/lib/avatars";
 import { NAME_BG_RARITY_LABEL, type NameBgDef } from "@/lib/nameBackgrounds";
 
@@ -1035,17 +1036,15 @@ function NameStyleStoreSection({
               }`}
             >
               <div className="min-w-0">
-                {/* Real nameplate preview */}
-                {b.plate ? (
-                  <span className={`relative inline-block max-w-[180px] truncate rounded-full px-3 py-0.5 text-sm font-bold ${b.plate} ${b.text}`}>
-                    {b.flourish && (
-                      <span aria-hidden className={`absolute inset-0 overflow-hidden rounded-full ${b.flourish}`} />
-                    )}
-                    <span className="relative">{studentName}</span>
-                  </span>
-                ) : (
-                  <span className="text-sm font-bold text-ink-900 dark:text-warm-ivory">{studentName}</span>
-                )}
+                {/* Real nameplate preview — animated, because the moving
+                    sheen is what the Epic tiers are actually selling. */}
+                <Nameplate
+                  name={studentName}
+                  bgId={b.id}
+                  animate
+                  className="max-w-[180px] text-sm font-bold"
+                  plainClass="text-ink-900 dark:text-warm-ivory"
+                />
                 <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-ink-400 dark:text-ink-500">
                   {NAME_BG_RARITY_LABEL[b.rarity]}
                 </p>
