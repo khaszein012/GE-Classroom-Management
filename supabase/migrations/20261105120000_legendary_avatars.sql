@@ -15,9 +15,12 @@ on top of the gold foil (src/index.css .avatar-prism).
 
 ## Prices, checked against the real earning rate
 
-Gems come from quizzes (max 10 per quiz, default). A student earning a few
-quizzes a week reaches 100 in roughly a term; 200 is the ambitious one.
-That is deliberate — the tier is the long game, not the impulse buy.
+Gems come from quizzes (max 10 per quiz, default). At the class's actual
+gem income - 15-30 per student per week - 100 gems is about one month of
+steady quizzing and 200 is roughly two. That is deliberate: the tier is a
+save, not an impulse buy, but it is reachable inside a term.
+(Corrected 2026-11-05: this file first said "100 in roughly a term", which
+overstated it ~4x by pricing without knowing the weekly rate.)
 
 ## What this migration does
 
