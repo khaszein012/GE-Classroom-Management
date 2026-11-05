@@ -179,6 +179,28 @@
   );
 }
 
+/* Legendary tier: an iridescent sweep on top of the gold foil, so a 100+
+   gem tile is distinguishable from an 80-gem one at a glance across a room.
+   Gold alone was doing that job for six styles; a colder, stronger highlight
+   makes the top tier read as a different class of thing. The first version
+   was one faint band and students could not tell it apart from Epic — this
+   is three overlapping bands at higher opacity. */
+.avatar-prism {
+  background-image: linear-gradient(
+      135deg,
+      rgb(125 211 252 / 0.55) 0 14%,
+      transparent 28% 44%,
+      rgb(240 171 252 / 0.55) 58% 74%,
+      transparent 88% 100%
+    ),
+    linear-gradient(
+      25deg,
+      transparent 0 38%,
+      rgb(255 255 255 / 0.28) 50%,
+      transparent 62% 100%
+    );
+}
+
 /* The animated twin of the sheen above: the same band, sliding slowly across
    a wide background so only the highlight travels.
 

@@ -73,6 +73,7 @@ export function Monogram({
       >
         <span className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
         {premium.flourish && <span className={`absolute inset-0 ${premium.flourish}`} />}
+        {premium.prism && <span className="avatar-prism absolute inset-0" />}
         <span aria-hidden className={`relative select-none leading-none ${GLYPH_CLASSES[size]}`}>
           {premium.glyph}
         </span>

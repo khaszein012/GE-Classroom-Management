@@ -10,6 +10,8 @@
 import { fetchAllPaged } from "../src/lib/paging";
 import { buildAchievementStats } from "../src/lib/achievements";
 import { nameStateFor } from "../src/lib/nameplateState";
+import { AVATARS, mergeAvatarCatalog, DEFAULT_AVATAR_ID } from "../src/lib/avatars";
+import { NAME_BACKGROUNDS } from "../src/lib/nameBackgrounds";
 
 let passed = 0;
 let failed = 0;
@@ -282,10 +284,93 @@ function testPlateStates() {
   ok("close has a label", nameStateFor({ goalTarget: 100, goalBalance: 85 }).label.length > 0);
 }
 
+// ---------- cosmetic catalog integrity --------------------------------------
+
+function testCatalogs() {
+  console.log("\navatar catalog");
+
+  {
+    const ids = AVATARS.map((a) => a.id);
+    ok("ids are unique", new Set(ids).size === ids.length, ids.length - new Set(ids).size);
+    ok("every style has a name", AVATARS.every((a) => a.name.length > 0));
+    ok("every style has a rarity label", AVATARS.every((a) => typeof a.rarity === "string"));
+    ok(
+      "every premium style has art (bg, ring, glyph)",
+      AVATARS.filter((a) => a.id !== DEFAULT_AVATAR_ID).every((a) => a.bg && a.ring && a.glyph),
+    );
+    ok(
+      "free style is free and has no art classes",
+      AVATARS.filter((a) => a.rarity === "free").every((a) => a.price === 0 && !a.bg && !a.glyph),
+    );
+    ok(
+      "every paid style has a positive price",
+      AVATARS.filter((a) => a.rarity !== "free").every((a) => a.price > 0),
+    );
+  }
+
+  {
+    // The Legendary tier: 5 styles, each strictly above the Epic ceiling.
+    const legendary = AVATARS.filter((a) => a.rarity === "legendary");
+    const epic = AVATARS.filter((a) => a.rarity === "epic");
+    const epicMax = Math.max(...epic.map((a) => a.price));
+    ok("five legendary styles", legendary.length === 5, legendary.length);
+    ok(
+      "every legendary costs more than the dearest epic",
+      legendary.every((a) => a.price > epicMax),
+      { epicMax, prices: legendary.map((a) => a.price) },
+    );
+    ok(
+      "legendary prices are all 100+ gems",
+      legendary.every((a) => a.price >= 100),
+      legendary.map((a) => a.price),
+    );
+    ok(
+      "legendary prices all differ (no two styles tie)",
+      new Set(legendary.map((a) => a.price)).size === legendary.length,
+    );
+    ok("every legendary has the prism overlay", legendary.every((a) => a.prism === true));
+    ok(
+      "no non-legendary style has the prism overlay",
+      AVATARS.filter((a) => a.rarity !== "legendary").every((a) => !a.prism),
+    );
+  }
+
+  {
+    // mergeAvatarCatalog: the DB wins on price, and unknown ids are skipped
+    // rather than rendered as a broken tile.
+    const rows = [
+      { id: "void-kraken", name: "Renamed Kraken", price: 250, sort_order: 0 },
+      { id: "does-not-exist", name: "Ghost", price: 5, sort_order: 1 },
+    ];
+    const merged = mergeAvatarCatalog(rows);
+    ok("unknown catalog ids are dropped", merged.length === 1, merged.length);
+    ok("db price overrides the client price", merged[0].price === 250, merged[0].price);
+    ok("db name overrides the client name", merged[0].name === "Renamed Kraken", merged[0].name);
+    ok("artwork still comes from the client", merged[0].glyph === "🐙", merged[0].glyph);
+  }
+
+  {
+    // Pre-migration the catalog read fails; local prices must still stand.
+    const fallback = mergeAvatarCatalog(null);
+    ok("null catalog falls back to every style", fallback.length === AVATARS.length, fallback.length);
+    ok(
+      "fallback is sorted cheapest first",
+      fallback.every((a, i) => i === 0 || fallback[i - 1].price <= a.price),
+      fallback.map((a) => a.price),
+    );
+  }
+
+  {
+    const ids = NAME_BACKGROUNDS.map((b) => b.id);
+    ok("name style ids are unique", new Set(ids).size === ids.length);
+  }
+}
+
 async function main() {
   await testPaging();
   testStreaks();
   testPlateStates();
+  testCatalogs();
   console.log(`\n${failed === 0 ? "ALL UNIT TESTS PASSED" : `${failed} TEST(S) FAILED`} — ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }

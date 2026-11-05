@@ -16,7 +16,7 @@
  * here plus the same id in the migration seed (ids are stable strings).
  */
 
-export type AvatarRarity = "free" | "uncommon" | "rare" | "epic";
+export type AvatarRarity = "free" | "uncommon" | "rare" | "epic" | "legendary";
 
 export interface AvatarDef {
   id: string;
@@ -32,6 +32,13 @@ export interface AvatarDef {
   glyph: string;
   /** Extra flourish layer class (sheen/pattern) for top tiers. */
   flourish?: string;
+  /**
+   * Adds the iridescent overlay on top of `flourish` — Legendary only, so the
+   * 100+ gem tier is distinguishable from the 80-gem Epic tier at a glance.
+   * A separate render layer rather than a second class on `flourish`, because
+   * two classes both setting background-image would overwrite each other.
+   */
+  prism?: boolean;
 }
 
 /** The default look: plain coloured monogram, free and always owned. */
@@ -148,6 +155,71 @@ export const AVATARS: readonly AvatarDef[] = [
     glyph: "🪐",
     flourish: "avatar-foil",
   },
+
+  // ----- Legendary (100-200 gems): the long-game tier -----------------------
+  // Above Epic, and deliberately scarce: five styles, rising to 200. At the
+  // class's real earning rate these take a couple of months of good quizzes,
+  // so they are something to save toward rather than a quick purchase. Each
+  // carries the prism overlay as well as the gold foil, which is what
+  // separates a Legendary tile from an Epic one at a glance.
+  //
+  // Only single-codepoint emoji are used here — newer ZWJ sequences (e.g.
+  // the phoenix) fall back to a blank box on older classroom machines.
+  {
+    id: "crystal-unicorn",
+    name: "Crystal Unicorn",
+    rarity: "legendary",
+    price: 100,
+    bg: "bg-gradient-to-br from-[#f9a8d4] via-[#c4b5fd] to-[#6d28d9]",
+    ring: "ring-[#f5d0fe]/80",
+    glyph: "🦄",
+    flourish: "avatar-foil",
+    prism: true,
+  },
+  {
+    id: "bamboo-panda",
+    name: "Bamboo Panda",
+    rarity: "legendary",
+    price: 120,
+    bg: "bg-gradient-to-br from-[#22c55e] via-[#166534] to-[#052e16]",
+    ring: "ring-[#bbf7d0]/80",
+    glyph: "🐼",
+    flourish: "avatar-foil",
+    prism: true,
+  },
+  {
+    id: "abyss-shark",
+    name: "Abyss Shark",
+    rarity: "legendary",
+    price: 145,
+    bg: "bg-gradient-to-br from-[#14b8a6] via-[#115e59] to-[#020c0b]",
+    ring: "ring-[#5eead4]/80",
+    glyph: "🦈",
+    flourish: "avatar-foil",
+    prism: true,
+  },
+  {
+    id: "moon-wolf",
+    name: "Moon Wolf",
+    rarity: "legendary",
+    price: 170,
+    bg: "bg-gradient-to-br from-[#64748b] via-[#1e293b] to-[#020617]",
+    ring: "ring-[#cbd5e1]/80",
+    glyph: "🐺",
+    flourish: "avatar-foil",
+    prism: true,
+  },
+  {
+    id: "void-kraken",
+    name: "Void Kraken",
+    rarity: "legendary",
+    price: 200,
+    bg: "bg-gradient-to-br from-[#a855f7] via-[#581c87] to-[#0a0118]",
+    ring: "ring-[#e879f9]/85",
+    glyph: "🐙",
+    flourish: "avatar-foil",
+    prism: true,
+  },
 ];
 
 const BY_ID = new Map(AVATARS.map((a) => [a.id, a]));
@@ -185,4 +257,5 @@ export const RARITY_LABEL: Record<AvatarRarity, string> = {
   uncommon: "Uncommon",
   rare: "Rare",
   epic: "Epic",
+  legendary: "Legendary",
 };
