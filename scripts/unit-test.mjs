@@ -404,6 +404,21 @@ function testNameStyles() {
   // Patterned plates are busy by nature; the name must stay readable first.
   ok("every legendary name style has a text shadow", legendary.every((b) => !!b.textShadow));
 
+  // The moving sheen is gated on `flourish` in Nameplate.tsx. Shipping four
+  // Legendary styles without it meant Crown Weave alone animated while the
+  // other four sat still - a payment-vs-delivery gap that is invisible in
+  // code review and obvious to a student who just spent 100 gems.
+  ok(
+    "every legendary name style has the animated flourish",
+    legendary.every((b) => b.flourish === "avatar-foil"),
+    legendary.map((b) => [b.id, b.flourish]),
+  );
+  ok(
+    "every epic name style still has the animated flourish",
+    epic.every((b) => b.flourish === "avatar-foil"),
+    epic.map((b) => [b.id, b.flourish]),
+  );
+
   ok(
     "every paid name style has plate classes",
     NAME_BACKGROUNDS.filter((b) => b.price > 0).every((b) => !!b.plate),
